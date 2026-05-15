@@ -5,7 +5,7 @@ import { syncToFirestore } from './lib/sync';
 import { generateToken } from './lib/accountability';
 import { auth } from './lib/firebase';
 
-export default function IdleHome({ onStartTracking }) {
+export default function IdleHome({ onStartTracking, onShowPrivacy }) {
     const [profile, setProfile] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [showSettings, setShowSettings] = useState(false);

@@ -124,26 +124,21 @@ class AIController {
     }
 
     async generateShameMessage(minutes) {
-        return new Promise(async (resolve) => {
-            try {
-                // dynamically import storage to avoid circular dependencies if any
-                const { getProfile, replaceProfile } = await import('./storage.js');
-                const profile = await getProfile();
-                
-                const { message, id } = getShameMessage(minutes, profile.lastShameMessageId, profile.totalSessions);
-                
-                // Save the id so we don't repeat next time
-                profile.lastShameMessageId = id;
-                await replaceProfile(profile);
-
-                setTimeout(() => {
-                    resolve(message);
-                }, 800);
-            } catch(e) {
-                // Fallback if storage fails
+        return new Promise((resolve) => {
+            import('./storage.js').then(({ getProfile, replaceProfile }) => {
+                return getProfile().then(profile => {
+                    const { message, id } = getShameMessage(minutes, profile.lastShameMessageId, profile.totalSessions);
+                    profile.lastShameMessageId = id;
+                    return replaceProfile(profile).then(() => {
+                        setTimeout(() => {
+                            resolve(message);
+                        }, 800);
+                    });
+                });
+            }).catch(e => {
                 const { message } = getShameMessage(minutes, null, 1);
                 resolve(message);
-            }
+            });
         });
     }
 }

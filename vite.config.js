@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     manifest: true,
     target: 'es2020',
-    chunkSizeWarningLimit: 200,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
@@ -18,9 +18,6 @@ export default defineConfig({
         }
       }
     }
-  },
-  esbuild: {
-    drop: ['console', 'debugger'],
   },
   optimizeDeps: {
     include: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
