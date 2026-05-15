@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800">
+  <rect width="400" height="800" fill="#000000" />
+  
+  <text x="24" y="60" font-family="Courier New, monospace" font-size="12" fill="#444444">SCR-20260515</text>
+  <text x="24" y="80" font-family="Courier New, monospace" font-size="12" fill="#444444">session 3.84</text>
+
+  <text x="200" y="360" font-family="Inter, sans-serif" font-size="88" font-weight="bold" fill="#E24B4A" text-anchor="middle" letter-spacing="-4">14:32</text>
+  <text x="200" y="400" font-family="Inter, sans-serif" font-size="14" fill="#666666" text-anchor="middle">the algorithm has you now.</text>
+
+  <text x="200" y="680" font-family="Inter, sans-serif" font-size="14" fill="#444444" text-anchor="middle" font-style="italic">"you thought about stopping. you didn't."</text>
+  <text x="200" y="740" font-family="Inter, sans-serif" font-size="16" fill="#888888" text-anchor="middle" cursor="pointer">i'm done</text>
+</svg>
