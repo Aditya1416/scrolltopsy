@@ -1,6 +1,10 @@
 import React from 'react';
 
 export default function ShameReport({ onReset, durationSeconds, shameMessage, aiProgress }) {
+    React.useEffect(() => {
+        sessionStorage.removeItem('sct_start');
+    }, []);
+
     const minutes = Math.ceil(durationSeconds / 60);
     const napPercentage = Math.round((minutes / 20) * 100);
 
