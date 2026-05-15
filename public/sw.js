@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scrolltopsy-v1';
+const CACHE_NAME = 'scrolltopsy-v2';
 
 // During build, Vite generates a manifest at dist/.vite/manifest.json
 // The SW reads this to discover all chunk filenames dynamically
