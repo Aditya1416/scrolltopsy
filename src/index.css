@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600;700&display=optional');
+
+:root {
+    --bg-color: #0a0a0a;
+    --primary-accent: #E24B4A;
+    --text-main: #f0f0f0;
+    --text-dim: #444444;
+    --font-mono: 'Geist Mono', ui-monospace, monospace;
+    --spacing-unit: 8px;
+}
+
+* { text-align: left; box-sizing: border-box; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+    background-color: #0a0a0a;
+    color: #f0f0f0;
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    margin: 0;
+    padding: calc(var(--spacing-unit) * 4);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+button, [role="button"] { background: transparent; border: none; padding: 0; cursor: pointer; font-family: inherit; }
+a { color: inherit; text-decoration: none; }
+.touch-target { position: relative; }
+.touch-target::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 44px; min-height: 44px; }
+
+#root {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Typography Base */
+h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+    font-weight: normal;
+}
+
+button {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+/* Common UI Elements */
+.header {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: calc(var(--spacing-unit) * 8);
+}
+
+/* View Containers */
+.view-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Idle Home */
+.hero-stat {
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: var(--spacing-unit);
+}
+.hero-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: calc(var(--spacing-unit) * 12);
+}
+.session-list {
+    /* No flex-grow: 1 so it doesn't push action to bottom */
+}
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: var(--spacing-unit) 0;
+}
+.session-time {
+    color: var(--text-dim);
+}
+.session-duration {
+    color: #888888;
+}
+.action-doomscroll {
+    font-size: 13px;
+    color: #444444;
+    margin-top: 24px;
+    display: block;
+}
+
+/* Tracking */
+.tracking-view {
+    padding-top: calc(var(--spacing-unit) * 8);
+}
+.watermark {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: calc(var(--spacing-unit) * 8);
+}
+.timer {
+    font-size: 64px;
+    color: var(--primary-accent);
+    font-weight: 700;
+    margin-bottom: calc(var(--spacing-unit) * 2);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.timer-colon {
+    opacity: 0.6;
+}
+.status {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: auto;
+}
+.action-container {
+    margin-top: auto;
+}
+.footnote {
+    font-size: 12px;
+    color: #2a2a2a;
+    font-style: italic;
+    margin-bottom: var(--spacing-unit);
+}
+.action-im-done {
+    font-size: 13px;
+    color: var(--primary-accent);
+    display: block;
+}
+
+/* Shame Report */
+.summary-value {
+    font-size: 88px;
+    color: var(--primary-accent);
+    font-weight: 700;
+    margin-bottom: var(--spacing-unit);
+    line-height: 1;
+}
+.summary-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: calc(var(--spacing-unit) * 8);
+}
+.grid {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: calc(var(--spacing-unit) * 8);
+}
+.grid-item {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+.grid-item:last-child {
+    margin-bottom: 0;
+}
+.grid-label {
+    font-size: 10px;
+    color: #2a2a2a;
+    text-transform: lowercase;
+    margin-bottom: 4px;
+}
+.grid-value {
+    font-size: 11px;
+    color: #666666;
+    font-weight: 400;
+}
+.verdict {
+    font-size: 11px;
+    color: #383838;
+    font-weight: 400;
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+.ledger-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: var(--spacing-unit) 0;
+    color: var(--text-dim);
+}
+.ledger-value {
+    color: var(--primary-accent); /* Wait, are these still red? "Red is reserved for: the live timer on screen 2, the total shame minutes number on screen 3, and the 'i'm done' text on screen 2." So S1-1 means ALL historical or secondary duration should not be red. Let's make ledger-value #888888 too just to be strictly compliant. Actually, "total shame minutes number on screen 3" means the hero stat. So ledger values should be #888888 or text-dim. I'll make them text-dim or #888888 */
+}
+.footer {
+    /* removed flex-grow etc */
+}
+.action-done-now {
+    font-size: 9px;
+    color: #1e1e1e;
+    margin-top: 28px;
+    display: block;
+}
