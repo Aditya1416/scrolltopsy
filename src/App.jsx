@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import IdleHome from './IdleHome';
 import Tracking from './Tracking';
 import ShameReport from './ShameReport';
@@ -61,6 +62,7 @@ function App() {
       {currentView === 'privacy' && (
         <Privacy onBack={handleReset} />
       )}
+      <Analytics />
     </>
   );
 }
