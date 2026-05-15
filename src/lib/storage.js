@@ -56,7 +56,7 @@ const DEFAULT_DATA = {
     meta: {}
 };
 
-async function getAllData() {
+export async function getAllData() {
     let dataStr = localStorage.getItem('sct_data');
     let data = null;
     if (dataStr) {
@@ -134,7 +134,7 @@ export function updateProfile() {
     // Logic handles in saveSession, this is an empty export to satisfy requirement
 }
 
-function recalculateScrolltype(profile, meta) {
+export function recalculateScrolltype(profile, meta) {
     const wh = profile.worstHour;
     if (wh >= 22 || wh <= 2) return "late-night doom merchant";
     if (wh >= 6 && wh <= 9) return "morning anxiety checker";
