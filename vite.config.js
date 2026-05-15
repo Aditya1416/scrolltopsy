@@ -25,5 +25,15 @@ export default defineConfig({
   optimizeDeps: {
     include: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
     exclude: ['@firebase/app-compat']
+  },
+  test: {
+    environment: 'happy-dom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json'],
+      include: ['src/lib/**/*.ts', 'src/lib/**/*.js'],
+    },
   }
 })
