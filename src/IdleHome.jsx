@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { getProfile, getSessions } from './lib/storage';
-import { signInWithGoogle, deleteAccount } from './lib/auth';
+import { signInWithGoogle, signOut, deleteAccount } from './lib/auth';
 import { syncToFirestore } from './lib/sync';
 import { generateToken } from './lib/accountability';
+import { maskEmail } from './lib/database';
 import { auth } from './lib/firebase';
 
-export default function IdleHome({ onStartTracking }) {
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'good morning';
+  if (h >= 12 && h < 17) return 'good afternoon';
+  if (h >= 17 && h < 21) return 'good evening';
+  return 'still up';
+}
+
+export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     const [profile, setProfile] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
@@ -16,15 +25,33 @@ export default function IdleHome({ onStartTracking }) {
             const p = await getProfile();
             setProfile(p);
             const s = await getSessions();
-            // Show only last 3 for UI, or all. We'll show last 3 to match design.
             setSessions(s.slice(-3).reverse());
         }
         loadData();
     }, []);
 
+    const handleSignIn = async () => {
+        try {
+            await signInWithGoogle();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            setShowSettings(false);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     const handleBackup = async () => {
         try {
-            const uid = auth.currentUser ? auth.currentUser.uid : await signInWithGoogle();
+            const uid = auth.currentUser
+                ? auth.currentUser.uid
+                : (await signInWithGoogle()).user.uid;
             await syncToFirestore(uid);
             alert('Backup complete.');
             setShowSettings(false);
@@ -36,7 +63,7 @@ export default function IdleHome({ onStartTracking }) {
 
     const handleDelete = async () => {
         try {
-            await deleteAccount();
+            await deleteAccount(auth.currentUser?.uid);
             window.location.reload();
         } catch (e) {
             console.error(e);
@@ -46,9 +73,11 @@ export default function IdleHome({ onStartTracking }) {
 
     const handleShare = async () => {
         try {
-            const uid = auth.currentUser ? auth.currentUser.uid : await signInWithGoogle();
+            const uid = auth.currentUser
+                ? auth.currentUser.uid
+                : (await signInWithGoogle()).user.uid;
             const token = await generateToken(uid);
-            setTokenDisplay(`scrolltopsy.com/share/${token}`);
+            setTokenDisplay(`scrolltopsy.vercel.app/week/${token}`);
         } catch (e) {
             console.error(e);
             alert('Share failed.');
@@ -56,6 +85,9 @@ export default function IdleHome({ onStartTracking }) {
     };
 
     if (!profile) return null;
+
+    const firstName = user?.displayName?.split(' ')[0];
+    const greeting = getGreeting();
 
     return (
         <div className="view-container" style={{ position: 'relative' }}>
@@ -65,15 +97,35 @@ export default function IdleHome({ onStartTracking }) {
 
             {showSettings && (
                 <div style={{ position: 'absolute', top: 20, right: 0, background: '#0a0a0a', padding: '8px', zIndex: 10 }}>
-                    <button className="action-doomscroll" style={{ marginTop: 0, fontSize: '12px', color: '#888' }} onClick={handleBackup}>back up my data</button>
+                    {user ? (
+                        <>
+                            <div style={{ fontSize: '10px', color: '#555', marginBottom: '4px' }}>{user.displayName}</div>
+                            <div style={{ fontSize: '9px', color: '#333', marginBottom: '10px' }}>{maskEmail(user.email)}</div>
+                            <button className="action-doomscroll" style={{ marginTop: 0, fontSize: '12px', color: '#888' }} onClick={handleSignOut}>sign out</button>
+                        </>
+                    ) : (
+                        <button className="action-doomscroll" style={{ marginTop: 0, fontSize: '12px', color: '#888' }} onClick={handleSignIn}>sign in with google</button>
+                    )}
+                    <button className="action-doomscroll" style={{ marginTop: '8px', fontSize: '12px', color: '#888' }} onClick={handleBackup}>back up my data</button>
                     <button className="action-doomscroll" style={{ marginTop: '8px', fontSize: '12px', color: '#888' }} onClick={handleShare}>share this week</button>
                     <button className="action-doomscroll" style={{ marginTop: '8px', fontSize: '12px', color: '#E24B4A' }} onClick={handleDelete}>delete all my data</button>
-                    <button className="action-doomscroll" style={{ marginTop: '8px', fontSize: '10px', color: '#2e2e2e' }} onClick={() => { setShowSettings(false); onShowPrivacy && onShowPrivacy(); }}>privacy policy</button>
                     {tokenDisplay && <div style={{ fontSize: '9px', marginTop: '8px', color: '#888' }}>{tokenDisplay}</div>}
                 </div>
             )}
 
             <div className="header">scrolltopsy</div>
+
+            {firstName && (
+                <div style={{ fontSize: '10px', color: '#555', marginBottom: '4px' }}>
+                    {greeting}, {firstName}.
+                </div>
+            )}
+            {profile.scrolltype && (
+                <div style={{ fontSize: '10px', color: '#333', marginBottom: '8px' }}>
+                    classification: {profile.scrolltype}
+                </div>
+            )}
+
             <div className="hero-stat">{profile.totalMins}</div>
             <div className="hero-label">min wasted globally</div>
             <div className="session-list">
