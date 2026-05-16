@@ -3,9 +3,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  apiKey: "AIzaSyAMqZNepbUBPBKirxAAPN3YJxTxzo0YIt8",
+  authDomain: "scrolltopsy.firebaseapp.com",
+  projectId: "scrolltopsy",
+  storageBucket: "scrolltopsy.firebasestorage.app",
+  messagingSenderId: "203371134876",
+  appId: "1:203371134876:web:66cae7d6a6ef3b2307d259",
 };
 
 const app = initializeApp(firebaseConfig);
