@@ -73,6 +73,7 @@ after 7 sessions, the app classifies you:
 | auth | Firebase Auth — Google Sign-In |
 | shame engine | 60+ static messages across 5 severity tiers |
 | PWA | service worker + manifest — installable on iOS and Android |
+| native android | Capacitor 8 — signed APK, haptics, dark splash |
 | deployment | Vercel |
 
 ---
@@ -175,6 +176,63 @@ after deploying, add your production domain to Firebase → Authentication → A
 **ios:** open in Safari → Share → Add to Home Screen
 
 works offline after the first visit. full-screen, dark splash, no browser chrome.
+
+---
+
+## install as a native android app (APK)
+
+the signed APK is at `releases/scrolltopsy-v1.0.0.apk` in this repo.
+
+**step 1 — get the file onto your phone**
+
+download it directly from GitHub on your phone's browser, or transfer it via USB / Google Drive / any file share method.
+
+**step 2 — allow installation from unknown sources**
+
+android blocks sideloaded APKs by default. the exact path depends on your android version:
+
+| android version | path |
+|---|---|
+| android 8.0+ (Oreo and later) | Settings → Apps → ⋮ → Special app access → Install unknown apps → select your browser or Files app → Allow |
+| android 7 and below | Settings → Security → Unknown sources → enable |
+
+you only need to do this once per source app (e.g. Chrome, Files).
+
+**step 3 — install**
+
+open the APK file from your downloads or file manager.  
+tap **Install** when prompted.  
+tap **Open** when complete.
+
+**step 4 — restore the default (optional but recommended)**
+
+after installing, go back and disable "install unknown apps" for that source app.  
+it is good hygiene.
+
+**what the app asks for**
+
+- no permissions are required on first launch
+- internet access is used only if you opt in to cloud backup (firebase sync)
+- no location, no contacts, no camera, no notifications
+
+**troubleshooting**
+
+| symptom | fix |
+|---|---|
+| "App not installed" | you may have a corrupted download — re-download the APK and try again |
+| "Unsafe app" warning | tap **More details** → **Install anyway** — this appears for all sideloaded APKs regardless of content |
+| app crashes on launch | ensure you are on android 7.0 (API 24) or higher |
+| play protect warning | tap **Install anyway** — play protect flags all apps not distributed via the Play Store |
+
+**APK details**
+
+```
+package:     app.scrolltopsy.android
+version:     1.0.0
+min android: 7.0 (API 24)
+size:        3.2 MB
+signed:      RSA-2048, self-signed release keystore
+```
 
 ---
 
