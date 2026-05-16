@@ -1,26 +1,53 @@
-import { signInWithPopup, GoogleAuthProvider, signOut as fbSignOut } from 'firebase/auth';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { auth, db } from './firebase';
-import { deleteAllLocalData } from './storage';
+import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from './firebase.js';
+import { deleteAllLocalData } from './storage.js';
+
+const PRIVACY_VERSION = '1.0';
 
 export async function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user.uid;
+  const provider = new GoogleAuthProvider();
+  provider.addScope('profile');
+  provider.addScope('email');
+  const result = await signInWithPopup(auth, provider);
+  const user = result.user;
+
+  const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+  if (!userDoc.exists() || !userDoc.data().privacyPolicyAcceptedAt) {
+    return { user, requiresConsent: true };
+  }
+
+  return { user, requiresConsent: false };
+}
+
+export async function acceptPrivacyAndComplete(user) {
+  await setDoc(doc(db, 'users', user.uid), {
+    uid: user.uid,
+    displayName: user.displayName || 'scrolltopsy user',
+    photoURL: user.photoURL || '',
+    createdAt: serverTimestamp(),
+    privacyPolicyAcceptedAt: serverTimestamp(),
+    privacyPolicyVersion: PRIVACY_VERSION,
+    totalSessions: 0,
+    totalMins: 0,
+    longestSessionMins: 0,
+    scrolltype: '',
+    worstHour: -1,
+    worstDay: '',
+    weeklyStats: [],
+  }, { merge: true });
+
+  return user;
 }
 
 export async function signOut() {
-    await fbSignOut(auth);
-    // Does NOT clear localStorage — user keeps their local data
+  await firebaseSignOut(auth);
 }
 
-export async function deleteAccount() {
-    const uid = auth.currentUser?.uid;
-    if (uid) {
-        // Deletes Firestore document users/{uid}/scrolltopsy
-        // Using a subcollection document to satisfy typical Firestore path requirements
-        await deleteDoc(doc(db, 'users', uid, 'scrolltopsy', 'data'));
-        await deleteAllLocalData();
-        await fbSignOut(auth);
-    }
+export async function deleteAccount(uid) {
+  if (!uid) return;
+  await deleteDoc(doc(db, 'users', uid));
+  await deleteAllLocalData();
+  await firebaseSignOut(auth);
 }
