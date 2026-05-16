@@ -1,6 +1,11 @@
 import React from 'react';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 export default function ShameReport({ onReset, durationSeconds, shameMessage, aiProgress }) {
+    React.useEffect(() => {
+        Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+    }, []);
+
     React.useEffect(() => {
         sessionStorage.removeItem('sct_start');
     }, []);

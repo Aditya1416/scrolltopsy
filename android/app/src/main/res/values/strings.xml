@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Scrolltopsy</string>
+    <string name="title_activity_main">Scrolltopsy</string>
+    <string name="package_name">app.scrolltopsy.android</string>
+    <string name="custom_url_scheme">app.scrolltopsy.android</string>
+</resources>
