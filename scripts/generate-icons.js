@@ -37,7 +37,8 @@ async function run() {
       fs.mkdirSync(dest, { recursive: true });
       await sharp(svg).resize(size, size).png().toFile(path.join(dest, 'ic_launcher.png'));
       await sharp(svg).resize(size, size).png().toFile(path.join(dest, 'ic_launcher_round.png'));
-      console.log('✓ android/' + dir + '/ic_launcher.png', size + 'x' + size);
+      await sharp(svg).resize(size, size).png().toFile(path.join(dest, 'ic_launcher_foreground.png'));
+      console.log('✓ android/' + dir + '/ic_launcher*.png', size + 'x' + size);
     }
   }
 }
