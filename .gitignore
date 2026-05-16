@@ -28,3 +28,7 @@ dist-ssr
 .env.local
 .env*.local
 *.tsbuildinfo
+
+# Android secrets
+android/key.properties
+android/*.keystore
