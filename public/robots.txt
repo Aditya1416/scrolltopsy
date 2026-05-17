@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /week/
+Sitemap: https://scrolltopsy.vercel.app/sitemap.xml
