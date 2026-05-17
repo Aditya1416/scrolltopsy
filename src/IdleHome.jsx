@@ -48,16 +48,17 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     };
 
     const handleBackup = async () => {
+        if (!auth.currentUser) {
+            alert('Sign in first to back up your data.');
+            return;
+        }
         try {
-            const uid = auth.currentUser
-                ? auth.currentUser.uid
-                : (await signInWithGoogle()).user.uid;
-            await syncToFirestore(uid);
+            await syncToFirestore(auth.currentUser.uid);
             alert('Backup complete.');
             setShowSettings(false);
         } catch (e) {
             console.error(e);
-            alert('Backup failed.');
+            alert(`Backup failed: ${e.code || e.message}`);
         }
     };
 
@@ -72,15 +73,16 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     };
 
     const handleShare = async () => {
+        if (!auth.currentUser) {
+            alert('Sign in first to share this week.');
+            return;
+        }
         try {
-            const uid = auth.currentUser
-                ? auth.currentUser.uid
-                : (await signInWithGoogle()).user.uid;
-            const token = await generateToken(uid);
+            const token = await generateToken(auth.currentUser.uid);
             setTokenDisplay(`scrolltopsy.vercel.app/week/${token}`);
         } catch (e) {
             console.error(e);
-            alert('Share failed.');
+            alert(`Share failed: ${e.code || e.message}`);
         }
     };
 
