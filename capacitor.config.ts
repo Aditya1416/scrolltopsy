@@ -22,7 +22,11 @@ const config: CapacitorConfig = {
       androidSplashResourceName: 'splash',
       splashFullScreen: true,
       splashImmersive: true
-    }
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
+    },
   }
 };
 

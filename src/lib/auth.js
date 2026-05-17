@@ -1,33 +1,39 @@
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut as firebaseSignOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { deleteAllLocalData } from './storage.js';
 
 const PRIVACY_VERSION = '1.0';
+const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true;
 
-// Capacitor WebView on Android can't handle popups — use redirect instead
-const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+async function getFirebaseAuthPlugin() {
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+  return FirebaseAuthentication;
+}
 
 export async function signInWithGoogle() {
-  const provider = new GoogleAuthProvider();
-  provider.addScope('profile');
-  provider.addScope('email');
+  let user;
 
   if (isNative) {
-    // Page will redirect to Google then back — onAuthStateChanged handles the result
-    await signInWithRedirect(auth, provider);
-    return { user: null, requiresConsent: false };
+    // Native Google Sign-In — no WebView OAuth, uses Google Play Services
+    const FirebaseAuthentication = await getFirebaseAuthPlugin();
+    const result = await FirebaseAuthentication.signInWithGoogle();
+    if (!result.credential?.idToken) throw new Error('No ID token received from Google');
+    const credential = GoogleAuthProvider.credential(result.credential.idToken);
+    const firebaseResult = await signInWithCredential(auth, credential);
+    user = firebaseResult.user;
+  } else {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('profile');
+    provider.addScope('email');
+    const result = await signInWithPopup(auth, provider);
+    user = result.user;
   }
 
-  const result = await signInWithPopup(auth, provider);
-  const user = result.user;
-
   const userDoc = await getDoc(doc(db, 'users', user.uid));
-
   if (!userDoc.exists() || !userDoc.data().privacyPolicyAcceptedAt) {
     return { user, requiresConsent: true };
   }
-
   return { user, requiresConsent: false };
 }
 
