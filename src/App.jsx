@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import AuthGate from './AuthGate';
 import IdleHome from './IdleHome';
 import Tracking from './Tracking';
 import ShameReport from './ShameReport';
@@ -15,7 +16,8 @@ import { ai } from './lib/ai';
 import './index.css';
 
 function MainApp() {
-  const [currentView, setCurrentView] = useState('idle'); // 'idle', 'tracking', 'report', 'privacy', 'consent'
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentView, setCurrentView] = useState('idle');
   const [user, setUser] = useState(null);
   const [pendingConsentUser, setPendingConsentUser] = useState(null);
   const [lastSessionDuration, setLastSessionDuration] = useState(0);
@@ -29,6 +31,7 @@ function MainApp() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         setUser(null);
+        setAuthChecked(true);
         return;
       }
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -38,6 +41,7 @@ function MainApp() {
         setPendingConsentUser(firebaseUser);
         setCurrentView('consent');
       }
+      setAuthChecked(true);
     });
     return unsubscribe;
   }, []);
@@ -55,9 +59,7 @@ function MainApp() {
     setCurrentView('idle');
   };
 
-  const handleStartTracking = () => {
-    setCurrentView('tracking');
-  };
+  const handleStartTracking = () => setCurrentView('tracking');
 
   const handleFinishTracking = async (durationSeconds) => {
     const mins = Math.ceil(durationSeconds / 60);
@@ -65,37 +67,38 @@ function MainApp() {
     await saveSession(mins);
     setCurrentView('report');
 
-    setShameMessage("Analyzing behavior...");
+    setShameMessage('Analyzing behavior...');
     try {
       const msg = await ai.generateShameMessage(mins);
       setShameMessage(msg);
     } catch (e) {
-      setShameMessage("This time is gone forever.");
+      setShameMessage('This time is gone forever.');
     }
   };
 
-  const handleReset = () => {
-    setCurrentView('idle');
-  };
+  const handleReset = () => setCurrentView('idle');
+  const handleShowPrivacy = () => setCurrentView('privacy');
 
-  const handleShowPrivacy = () => {
-    setCurrentView('privacy');
-  };
+  // Blank while Firebase resolves auth state
+  if (!authChecked) return null;
+
+  // Mandatory sign-in gate
+  if (!user && !pendingConsentUser) return <AuthGate />;
 
   return (
     <>
-      {currentView === 'idle' && (
-        <IdleHome
-          onStartTracking={handleStartTracking}
-          onShowPrivacy={handleShowPrivacy}
-          user={user}
-        />
-      )}
       {currentView === 'consent' && (
         <PrivacyConsent
           user={pendingConsentUser}
           onAccept={handleAcceptPrivacy}
           onDecline={handleDeclinePrivacy}
+        />
+      )}
+      {currentView === 'idle' && (
+        <IdleHome
+          onStartTracking={handleStartTracking}
+          onShowPrivacy={handleShowPrivacy}
+          user={user}
         />
       )}
       {currentView === 'tracking' && (
