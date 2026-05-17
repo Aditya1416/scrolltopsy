@@ -129,7 +129,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
             )}
 
             <div className="hero-stat">{profile.totalMins}</div>
-            <div className="hero-label">min wasted globally</div>
+            <div className="hero-label">min wasted today</div>
             <div className="session-list">
                 {sessions.length === 0 && (
                     <div className="session-item" style={{ borderBottom: 'none' }}>
