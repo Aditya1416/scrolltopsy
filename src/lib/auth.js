@@ -4,21 +4,18 @@ import { auth, db } from './firebase.js';
 import { deleteAllLocalData } from './storage.js';
 
 const PRIVACY_VERSION = '1.0';
-const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true;
-
-async function getFirebaseAuthPlugin() {
-  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-  return FirebaseAuthentication;
-}
 
 export async function signInWithGoogle() {
   let user;
 
+  // Check at call time (not module load) so Capacitor bridge is guaranteed ready
+  const isNative = window.Capacitor?.isNativePlatform?.() === true;
+
   if (isNative) {
-    // Native Google Sign-In — no WebView OAuth, uses Google Play Services
-    const FirebaseAuthentication = await getFirebaseAuthPlugin();
+    // Native Google Sign-In — shows system account picker, no WebView/browser involved
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
     const result = await FirebaseAuthentication.signInWithGoogle();
-    if (!result.credential?.idToken) throw new Error('No ID token received from Google');
+    if (!result.credential?.idToken) throw new Error('No ID token from Google');
     const credential = GoogleAuthProvider.credential(result.credential.idToken);
     const firebaseResult = await signInWithCredential(auth, credential);
     user = firebaseResult.user;
