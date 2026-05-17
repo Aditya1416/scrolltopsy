@@ -35,6 +35,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
             await signInWithGoogle();
         } catch (e) {
             console.error(e);
+            alert(`Sign in failed: ${e.code || e.message}`);
         }
     };
 
