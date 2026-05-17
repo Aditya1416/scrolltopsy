@@ -24,7 +24,7 @@ const config: CapacitorConfig = {
       splashImmersive: true
     },
     FirebaseAuthentication: {
-      skipNativeAuth: false,
+      skipNativeAuth: true,
       providers: ['google.com'],
     },
   }
