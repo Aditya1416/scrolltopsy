@@ -1,14 +1,24 @@
-import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { deleteAllLocalData } from './storage.js';
 
 const PRIVACY_VERSION = '1.0';
 
+// Capacitor WebView on Android can't handle popups — use redirect instead
+const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.addScope('profile');
   provider.addScope('email');
+
+  if (isNative) {
+    // Page will redirect to Google then back — onAuthStateChanged handles the result
+    await signInWithRedirect(auth, provider);
+    return { user: null, requiresConsent: false };
+  }
+
   const result = await signInWithPopup(auth, provider);
   const user = result.user;
 
