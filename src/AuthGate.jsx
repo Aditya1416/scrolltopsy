@@ -63,13 +63,13 @@ const s = {
 export default function AuthGate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const debugInfo = `cap=${typeof window !== 'undefined' ? (window.Capacitor ? 'yes' : 'no') : 'ssr'} native=${typeof window !== 'undefined' ? String(window.Capacitor?.isNativePlatform?.()) : 'ssr'}`;
 
   const handleSignIn = async () => {
     setLoading(true);
     setError('');
     try {
       await signInWithGoogle();
+      setLoading(false);
     } catch (e) {
       setError(e.code || e.message);
       setLoading(false);
@@ -90,7 +90,6 @@ export default function AuthGate() {
         {error ? (
           <div style={s.error}>{error}</div>
         ) : null}
-        <div style={{ fontSize: '9px', color: '#555', marginTop: '16px', fontFamily: 'monospace' }}>{debugInfo}</div>
       </div>
 
       <div>
