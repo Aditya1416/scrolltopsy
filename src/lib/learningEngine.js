@@ -1,4 +1,5 @@
 import { getSessions, getProfile } from './storage.js';
+import { getTopApp } from './appData.js';
 
 function getTimeOfDay(hour) {
   if (hour >= 6 && hour < 12) return 'morning';
@@ -87,6 +88,8 @@ export async function analysePatterns() {
     : 0;
   const relapsing = recentSessions.length > 0 && prevAvg > 0 && averageSessionMins > prevAvg;
 
+  const topApp = getTopApp(sessions);
+
   const patterns = {
     worstHour,
     worstDay,
@@ -98,6 +101,7 @@ export async function analysePatterns() {
     triggerPattern,
     peakSessionLength,
     currentMomentumScore,
+    topApp,
   };
 
   localStorage.setItem('sct_patterns', JSON.stringify(patterns));
@@ -159,6 +163,15 @@ export function getPersonalisedGreeting(firstName) {
     return `right on schedule${namePart}.`;
   }
   return `good ${time}${namePart}.`;
+}
+
+const PATTERNS_DATE_KEY = 'sct_patterns_date';
+
+export async function maybeAnalysePatternsToday() {
+  const today = new Date().toDateString();
+  if (localStorage.getItem(PATTERNS_DATE_KEY) === today) return;
+  await analysePatterns();
+  localStorage.setItem(PATTERNS_DATE_KEY, today);
 }
 
 export function getContextualSuffix(context) {

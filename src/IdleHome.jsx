@@ -5,7 +5,8 @@ import { syncToFirestore } from './lib/sync';
 import { generateToken } from './lib/accountability';
 import { maskEmail } from './lib/database';
 import { auth } from './lib/firebase';
-import { analysePatterns, getPersonalisedGreeting } from './lib/learningEngine';
+import { maybeAnalysePatternsToday, getPersonalisedGreeting } from './lib/learningEngine';
+import { hasUsagePermission, requestUsagePermission } from './lib/usageStats';
 
 export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     const [profile, setProfile] = useState(null);
@@ -13,12 +14,13 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     const [todayMins, setTodayMins] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
     const [tokenDisplay, setTokenDisplay] = useState(null);
+    const [usagePermission, setUsagePermission] = useState(null);
 
     useEffect(() => {
         async function loadData() {
             const p = await getProfile();
             const all = await getSessions();
-            await analysePatterns();
+            await maybeAnalysePatternsToday();
             const today = new Date().toDateString();
             setTodayMins(
                 all.filter(s => new Date(s.timestamp).toDateString() === today)
@@ -28,6 +30,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
             setProfile(p);
         }
         loadData();
+        hasUsagePermission().then(granted => setUsagePermission(granted));
     }, []);
 
     const handleSignIn = async () => {
@@ -110,6 +113,15 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
             )}
 
             <div className="header">scrolltopsy</div>
+
+            {usagePermission === false && (
+                <div
+                    style={{ fontSize: '9px', color: '#E24B4A', marginBottom: '6px', cursor: 'pointer', letterSpacing: '0.04em' }}
+                    onClick={requestUsagePermission}
+                >
+                    enable app detection →
+                </div>
+            )}
 
             {firstName && (
                 <div style={{ fontSize: '10px', color: '#555', marginBottom: '4px' }}>
