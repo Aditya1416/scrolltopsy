@@ -1,5 +1,6 @@
 import React from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { getPersonalisedShameContext, getContextualSuffix } from './lib/learningEngine';
 
 export default function ShameReport({ onReset, durationSeconds, shameMessage, aiProgress }) {
     React.useEffect(() => {
@@ -12,6 +13,10 @@ export default function ShameReport({ onReset, durationSeconds, shameMessage, ai
 
     const minutes = Math.ceil(durationSeconds / 60);
     const napPercentage = Math.round((minutes / 20) * 100);
+    const shameContext = getPersonalisedShameContext(minutes);
+    const suffix = getContextualSuffix(shameContext);
+    const isAnalysing = shameMessage === 'Analyzing behavior...';
+    const verdict = isAnalysing || !suffix ? shameMessage : `${shameMessage} ${suffix}`;
 
     return (
         <div className="view-container">
@@ -38,7 +43,7 @@ export default function ShameReport({ onReset, durationSeconds, shameMessage, ai
                 </div>
             </div>
 
-            <div className="verdict">{aiProgress || shameMessage}</div>
+            <div className="verdict">{aiProgress || verdict}</div>
 
             <div className="ledger-row">
                 <span>Current Session</span>

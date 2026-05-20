@@ -5,14 +5,7 @@ import { syncToFirestore } from './lib/sync';
 import { generateToken } from './lib/accountability';
 import { maskEmail } from './lib/database';
 import { auth } from './lib/firebase';
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return 'good morning';
-  if (h >= 12 && h < 17) return 'good afternoon';
-  if (h >= 17 && h < 21) return 'good evening';
-  return 'still up';
-}
+import { analysePatterns, getPersonalisedGreeting } from './lib/learningEngine';
 
 export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     const [profile, setProfile] = useState(null);
@@ -24,14 +17,15 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     useEffect(() => {
         async function loadData() {
             const p = await getProfile();
-            setProfile(p);
             const all = await getSessions();
+            await analysePatterns();
             const today = new Date().toDateString();
             setTodayMins(
                 all.filter(s => new Date(s.timestamp).toDateString() === today)
                    .reduce((sum, s) => sum + s.durationMins, 0)
             );
             setSessions(all.slice(-3).reverse());
+            setProfile(p);
         }
         loadData();
     }, []);
@@ -96,7 +90,6 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
     if (!profile) return null;
 
     const firstName = user?.displayName?.split(' ')[0];
-    const greeting = getGreeting();
 
     return (
         <div className="view-container" style={{ position: 'relative' }}>
@@ -120,7 +113,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
 
             {firstName && (
                 <div style={{ fontSize: '10px', color: '#555', marginBottom: '4px' }}>
-                    {greeting}, {firstName}.
+                    {getPersonalisedGreeting(firstName)}
                 </div>
             )}
             {profile.scrolltype && (
