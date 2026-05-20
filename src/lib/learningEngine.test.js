@@ -1,5 +1,5 @@
 import { IDBFactory } from 'fake-indexeddb'
-import { analysePatterns, getPersonalisedGreeting, getContextualSuffix } from './learningEngine.js'
+import { analysePatterns, getPersonalisedGreeting, getContextualSuffix, maybeAnalysePatternsToday } from './learningEngine.js'
 
 function resetIDB() {
   Object.defineProperty(globalThis, 'indexedDB', {
@@ -126,5 +126,40 @@ describe('triggerPattern', () => {
     seedStorage(sessions)
     const patterns = await analysePatterns()
     expect(patterns.triggerPattern).toBe('night')
+  })
+})
+
+// ─── topApp in patterns ───────────────────────────────────────────────────────
+
+describe('analysePatterns — topApp', () => {
+  it('includes topApp as null when no app data is stored', async () => {
+    const now = Date.now()
+    seedStorage([{ id: '1', durationMins: 10, hour: 14, day: 'monday', timestamp: now - 1000 }])
+    const patterns = await analysePatterns()
+    expect(patterns).toHaveProperty('topApp')
+    expect(patterns.topApp).toBeNull()
+  })
+})
+
+// ─── maybeAnalysePatternsToday ────────────────────────────────────────────────
+
+describe('maybeAnalysePatternsToday', () => {
+  it('runs and sets the date key on first call', async () => {
+    const now = Date.now()
+    seedStorage([{ id: '1', durationMins: 5, hour: 14, day: 'monday', timestamp: now - 1000 }])
+    await maybeAnalysePatternsToday()
+    const stored = localStorage.getItem('sct_patterns_date')
+    expect(stored).toBe(new Date().toDateString())
+  })
+
+  it('skips analysis on a second call the same day', async () => {
+    const now = Date.now()
+    seedStorage([{ id: '1', durationMins: 5, hour: 14, day: 'monday', timestamp: now - 1000 }])
+    await maybeAnalysePatternsToday()
+    // Clear patterns to detect if analysePatterns runs again
+    localStorage.removeItem('sct_patterns')
+    await maybeAnalysePatternsToday()
+    // Patterns should NOT be re-populated (skipped)
+    expect(localStorage.getItem('sct_patterns')).toBeNull()
   })
 })

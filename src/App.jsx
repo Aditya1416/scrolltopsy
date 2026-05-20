@@ -9,10 +9,14 @@ import ShameReport from './ShameReport';
 import Privacy from './Privacy';
 import PrivacyConsent from './PrivacyConsent';
 import WeekView from './pages/WeekView';
-import { saveSession } from './lib/storage';
+import { saveSession, getSessions, getProfile, replaceProfile } from './lib/storage';
 import { acceptPrivacyAndComplete, signOut } from './lib/auth';
 import { auth, db } from './lib/firebase';
 import { ai } from './lib/ai';
+import { analysePatterns } from './lib/learningEngine';
+import { detectTopApp } from './lib/usageStats';
+import { storeAppForSession, normaliseName } from './lib/appData';
+import { classifyWithApp } from './lib/appClassifier';
 import './index.css';
 
 function MainApp() {
@@ -63,8 +67,33 @@ function MainApp() {
 
   const handleFinishTracking = async (durationSeconds) => {
     const mins = Math.ceil(durationSeconds / 60);
+    const sessionEndMs = Date.now();
+    const sessionStartMs = sessionEndMs - durationSeconds * 1000;
+
     setLastSessionDuration(durationSeconds);
     await saveSession(mins);
+
+    // Detect which app was in foreground during the session
+    const detected = await detectTopApp(sessionStartMs, sessionEndMs);
+    if (detected) {
+      const appName = normaliseName(detected.appName, detected.packageName);
+      if (appName) {
+        const sessions = await getSessions();
+        const lastSession = sessions[sessions.length - 1];
+        if (lastSession) storeAppForSession(lastSession.id, appName);
+      }
+    }
+
+    // Re-analyse patterns with fresh session + app data
+    const patterns = await analysePatterns();
+
+    // Re-classify scrolltype with app awareness — update profile
+    const profile = await getProfile();
+    const newScrolltype = classifyWithApp(profile, patterns, patterns.topApp);
+    if (newScrolltype !== profile.scrolltype) {
+      await replaceProfile({ ...profile, scrolltype: newScrolltype });
+    }
+
     setCurrentView('report');
 
     setShameMessage('Analyzing behavior...');
