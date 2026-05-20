@@ -26,6 +26,7 @@ function MainApp() {
   const [pendingConsentUser, setPendingConsentUser] = useState(null);
   const [lastSessionDuration, setLastSessionDuration] = useState(0);
   const [shameMessage, setShameMessage] = useState('Analyzing behavior...');
+  const [todayTotalMins, setTodayTotalMins] = useState(0);
 
   useEffect(() => {
     ai.loadModel();
@@ -38,20 +39,36 @@ function MainApp() {
         setAuthChecked(true);
         return;
       }
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (userDoc.exists() && userDoc.data().privacyPolicyAcceptedAt) {
+
+      // Fast path: check session consent cache to avoid Firestore round-trip
+      if (sessionStorage.getItem('sct_consent') === firebaseUser.uid) {
         setUser(firebaseUser);
-      } else {
-        setPendingConsentUser(firebaseUser);
-        setCurrentView('consent');
+        setAuthChecked(true);
+        return;
       }
-      setAuthChecked(true);
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists() && userDoc.data().privacyPolicyAcceptedAt) {
+          sessionStorage.setItem('sct_consent', firebaseUser.uid);
+          setUser(firebaseUser);
+        } else {
+          setPendingConsentUser(firebaseUser);
+          setCurrentView('consent');
+        }
+      } catch {
+        // Firestore unavailable — allow access with signed-in state
+        setUser(firebaseUser);
+      } finally {
+        setAuthChecked(true);
+      }
     });
     return unsubscribe;
   }, []);
 
   const handleAcceptPrivacy = async (u) => {
     await acceptPrivacyAndComplete(u);
+    sessionStorage.setItem('sct_consent', u.uid);
     setUser(u);
     setPendingConsentUser(null);
     setCurrentView('idle');
@@ -73,21 +90,25 @@ function MainApp() {
     setLastSessionDuration(durationSeconds);
     await saveSession(mins);
 
-    // Detect which app was in foreground during the session
+    const sessions = await getSessions();
+
     const detected = await detectTopApp(sessionStartMs, sessionEndMs);
     if (detected) {
       const appName = normaliseName(detected.appName, detected.packageName);
       if (appName) {
-        const sessions = await getSessions();
         const lastSession = sessions[sessions.length - 1];
         if (lastSession) storeAppForSession(lastSession.id, appName);
       }
     }
 
-    // Re-analyse patterns with fresh session + app data
-    const patterns = await analysePatterns();
+    // Today total for shame report display
+    const today = new Date().toDateString();
+    const todayTotal = sessions
+      .filter(s => new Date(s.timestamp).toDateString() === today)
+      .reduce((sum, s) => sum + s.durationMins, 0);
+    setTodayTotalMins(todayTotal);
 
-    // Re-classify scrolltype with app awareness — update profile
+    const patterns = await analysePatterns();
     const profile = await getProfile();
     const newScrolltype = classifyWithApp(profile, patterns, patterns.topApp);
     if (newScrolltype !== profile.scrolltype) {
@@ -95,12 +116,11 @@ function MainApp() {
     }
 
     setCurrentView('report');
-
     setShameMessage('Analyzing behavior...');
     try {
       const msg = await ai.generateShameMessage(mins);
       setShameMessage(msg);
-    } catch (e) {
+    } catch {
       setShameMessage('This time is gone forever.');
     }
   };
@@ -108,10 +128,7 @@ function MainApp() {
   const handleReset = () => setCurrentView('idle');
   const handleShowPrivacy = () => setCurrentView('privacy');
 
-  // Blank while Firebase resolves auth state
   if (!authChecked) return null;
-
-  // Mandatory sign-in gate
   if (!user && !pendingConsentUser) return <AuthGate />;
 
   return (
@@ -137,7 +154,9 @@ function MainApp() {
         <ShameReport
           durationSeconds={lastSessionDuration}
           onReset={handleReset}
+          onGoAgain={handleStartTracking}
           shameMessage={shameMessage}
+          todayTotalMins={todayTotalMins}
         />
       )}
       {currentView === 'privacy' && (
