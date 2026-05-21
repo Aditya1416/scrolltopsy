@@ -9,7 +9,7 @@ Vite + React + TypeScript + Tailwind + Firebase + Capacitor (Android)
 ## Commands
 - npm run dev
 - npm run build (outputs to dist/)
-- npm test (must always pass — 43 tests)
+- npm test (must always pass — 67 tests)
 - node scripts/generate-icons.js (icon generation)
 - npx cap sync android (sync web to Android)
 - cd android && ./gradlew assembleRelease (build APK)
@@ -26,7 +26,7 @@ Vite + React + TypeScript + Tailwind + Firebase + Capacitor (Android)
 - Accent red: #E24B4A on exactly 3 elements per screen
 - No borders on interactive elements
 - No card backgrounds
-- Geist Mono font throughout
+- Space Mono font throughout
 - No page transition animations
 
 ## Privacy rules
