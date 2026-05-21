@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAMqZNepbUBPBKirxAAPN3YJxTxzo0YIt8",
@@ -11,7 +12,10 @@ const firebaseConfig = {
   appId: "1:203371134876:web:66cae7d6a6ef3b2307d259",
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-export const auth = getAuth(app);
+const appAlreadyInitialized = getApps().length > 0;
+const app = appAlreadyInitialized ? getApps()[0] : initializeApp(firebaseConfig);
+export const auth = appAlreadyInitialized
+  ? getAuth(app)
+  : initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
 export const db = getFirestore(app);
 export const WEB_CLIENT_ID = '203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com';
