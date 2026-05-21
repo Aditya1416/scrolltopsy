@@ -32,3 +32,12 @@ dist-ssr
 # Android secrets
 android/key.properties
 android/*.keystore
+android/app/google-services.json
+
+# Vercel
+.vercel
+
+# Misc
+ruvector.db
+.claude-flow/
+releases/*.idsig
