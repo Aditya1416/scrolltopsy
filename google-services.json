@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "203371134876",
+    "project_id": "scrolltopsy",
+    "storage_bucket": "scrolltopsy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:203371134876:android:6e300d813400f69407d259",
+        "android_client_info": {
+          "package_name": "app.scrolltopsy.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "203371134876-k9kqab909aqg8vc0p70686hdabaksa4f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.scrolltopsy.android",
+            "certificate_hash": "ec9e7d6fd2697db39808ddc95bd0a24c319068c6"
+          }
+        },
+        {
+          "client_id": "203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSyE0mgEoYYBCLBMPtSiwfhoVr8ShZnRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
