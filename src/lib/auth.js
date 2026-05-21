@@ -1,32 +1,49 @@
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { auth, db } from './firebase.js';
 import { deleteAllLocalData } from './storage.js';
 
+const WEB_CLIENT_ID = '203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com';
 const PRIVACY_VERSION = '1.0';
+let _googleAuthReady = false;
+
+async function ensureGoogleAuth() {
+  if (_googleAuthReady) return;
+  await GoogleAuth.initialize({
+    clientId: WEB_CLIENT_ID,
+    scopes: ['profile', 'email'],
+    grantOfflineAccess: true,
+  });
+  _googleAuthReady = true;
+}
 
 export async function signInWithGoogle() {
-  let user;
-
-  // Check at call time (not module load) so Capacitor bridge is guaranteed ready
-  const isNative = window.Capacitor?.isNativePlatform?.() === true;
-
-  if (isNative) {
-    // Native Google Sign-In — shows system account picker, no WebView/browser involved
-    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-    const result = await FirebaseAuthentication.signInWithGoogle();
-    if (!result.credential?.idToken) throw new Error('No ID token from Google');
-    const credential = GoogleAuthProvider.credential(result.credential.idToken);
-    const firebaseResult = await signInWithCredential(auth, credential);
-    user = firebaseResult.user;
-  } else {
-    const provider = new GoogleAuthProvider();
-    provider.addScope('profile');
-    provider.addScope('email');
-    const result = await signInWithPopup(auth, provider);
-    user = result.user;
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await ensureGoogleAuth();
+      const googleUser = await GoogleAuth.signIn();
+      if (!googleUser?.authentication?.idToken) {
+        throw new Error('No ID token returned from Google Sign-In');
+      }
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      const result = await signInWithCredential(auth, credential);
+      return await _handleSignInResult(result.user);
+    } else {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
+      const result = await signInWithPopup(auth, provider);
+      return await _handleSignInResult(result.user);
+    }
+  } catch (error) {
+    console.error('signInWithGoogle error:', error.code || error.message, error);
+    throw error;
   }
+}
 
+async function _handleSignInResult(user) {
   const userDoc = await getDoc(doc(db, 'users', user.uid));
   if (!userDoc.exists() || !userDoc.data().privacyPolicyAcceptedAt) {
     return { user, requiresConsent: true };
