@@ -42,6 +42,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
   const [usagePermission, setUsagePermission] = useState(null);
   const [arcOffset, setArcOffset] = useState(CIRCUMFERENCE);
   const [patterns, setPatterns] = useState({});
+  const [backupStatus, setBackupStatus] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -90,16 +91,17 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
 
   const handleBackup = async () => {
     if (!auth.currentUser) {
-      alert('Sign in first to back up your data.');
+      alert('sign in first to back up your data.');
       return;
     }
     try {
-      await auth.currentUser.getIdToken(true);
       await syncToFirestore(auth.currentUser.uid);
-      alert('Backup complete.');
-      setShowSettings(false);
-    } catch (e) {
-      alert(`Backup failed: ${e.code || e.message}`);
+      setBackupStatus('backed up just now.');
+      setTimeout(() => setBackupStatus(''), 3000);
+    } catch (error) {
+      console.error('[backup] error:', error.code, error.message);
+      setBackupStatus('backup failed: ' + (error.message || 'check connection'));
+      setTimeout(() => setBackupStatus(''), 5000);
     }
   };
 
@@ -114,14 +116,15 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
 
   const handleShare = async () => {
     if (!auth.currentUser) {
-      alert('Sign in first to share this week.');
+      alert('sign in first to share your week.');
       return;
     }
     try {
       const token = await generateToken(auth.currentUser.uid);
       setTokenDisplay(`scrolltopsy.vercel.app/week/${token}`);
-    } catch (e) {
-      alert(`Share failed: ${e.code || e.message}`);
+    } catch (error) {
+      console.error('[share] error:', error.code, error.message);
+      alert('share failed: ' + (error.message || 'check connection'));
     }
   };
 
@@ -223,6 +226,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
                 <div className="bs-user-email">{maskEmail(user.email)}</div>
                 <button className="bs-row" onClick={handleSignOut}>sign out</button>
                 <button className="bs-row" onClick={handleBackup}>back up my data</button>
+                {backupStatus && <div className="bs-token">{backupStatus}</div>}
                 <button className="bs-row" onClick={handleShare}>share this week</button>
                 {tokenDisplay && <div className="bs-token">{tokenDisplay}</div>}
                 {usagePermission === false && (
