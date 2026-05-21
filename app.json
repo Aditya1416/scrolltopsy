@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Scrolltopsy",
+    "slug": "scrolltopsy",
+    "version": "3.0.0",
+    "orientation": "portrait",
+    "backgroundColor": "#000000",
+    "icon": "./assets/icon.png",
+    "scheme": "scrolltopsy",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "app.scrolltopsy.android",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.203371134876-konb605dmugl54691capabrc1nqldgjt"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "scrolltopsy"
+      }
+    }
+  }
+}
