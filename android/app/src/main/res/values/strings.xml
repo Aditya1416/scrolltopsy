@@ -4,4 +4,5 @@
     <string name="title_activity_main">Scrolltopsy</string>
     <string name="package_name">app.scrolltopsy.android</string>
     <string name="custom_url_scheme">app.scrolltopsy.android</string>
+    <string name="server_client_id">203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com</string>
 </resources>
