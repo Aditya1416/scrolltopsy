@@ -1,54 +1,54 @@
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithCredential, signOut as firebaseSignOut } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { auth, db } from './firebase.js';
-import { deleteAllLocalData } from './storage.js';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 const WEB_CLIENT_ID = '203371134876-konb605dmugl54691capabrc1nqldgjt.apps.googleusercontent.com';
 const PRIVACY_VERSION = '1.0';
-let _googleAuthReady = false;
-
-async function ensureGoogleAuth() {
-  if (_googleAuthReady) return;
-  await GoogleAuth.initialize({
-    clientId: WEB_CLIENT_ID,
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: true,
-  });
-  _googleAuthReady = true;
-}
 
 export async function signInWithGoogle() {
   try {
+    let user;
+
     if (Capacitor.isNativePlatform()) {
-      await ensureGoogleAuth();
+      // Android native: use @codetrix-studio/capacitor-google-auth
+      await GoogleAuth.initialize({
+        clientId: WEB_CLIENT_ID,
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+
       const googleUser = await GoogleAuth.signIn();
-      if (!googleUser?.authentication?.idToken) {
-        throw new Error('No ID token returned from Google Sign-In');
-      }
-      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+
+      const idToken = googleUser.authentication.idToken;
+      if (!idToken) throw new Error('No ID token returned from Google');
+
+      const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
-      return await _handleSignInResult(result.user);
+      user = result.user;
+
     } else {
+      // Web browser: use popup
+      const { signInWithPopup } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
       const result = await signInWithPopup(auth, provider);
-      return await _handleSignInResult(result.user);
+      user = result.user;
     }
-  } catch (error) {
-    console.error('signInWithGoogle error:', error.code || error.message, error);
-    throw error;
-  }
-}
 
-async function _handleSignInResult(user) {
-  const userDoc = await getDoc(doc(db, 'users', user.uid));
-  if (!userDoc.exists() || !userDoc.data().privacyPolicyAcceptedAt) {
-    return { user, requiresConsent: true };
+    // Check if user has accepted privacy policy
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists() || !userDoc.data().privacyPolicyAcceptedAt) {
+      return { user, requiresConsent: true };
+    }
+    return { user, requiresConsent: false };
+
+  } catch (error) {
+    console.error('[auth] signInWithGoogle error:', error.code, error.message);
+    throw new Error(error.message || 'Google sign-in failed');
   }
-  return { user, requiresConsent: false };
 }
 
 export async function acceptPrivacyAndComplete(user) {
@@ -67,17 +67,26 @@ export async function acceptPrivacyAndComplete(user) {
     worstDay: '',
     weeklyStats: [],
   }, { merge: true });
-
   return user;
 }
 
 export async function signOut() {
-  await firebaseSignOut(auth);
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await GoogleAuth.signOut();
+    }
+    await firebaseSignOut(auth);
+  } catch (error) {
+    console.error('[auth] signOut error:', error);
+  }
 }
 
 export async function deleteAccount(uid) {
-  if (!uid) return;
-  await deleteDoc(doc(db, 'users', uid));
-  await deleteAllLocalData();
-  await firebaseSignOut(auth);
+  try {
+    await deleteDoc(doc(db, 'users', uid));
+    await signOut();
+  } catch (error) {
+    console.error('[auth] deleteAccount error:', error);
+    throw error;
+  }
 }
