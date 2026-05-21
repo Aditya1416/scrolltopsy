@@ -29,7 +29,12 @@ export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, u => setUser(u ?? null));
+    const timeout = setTimeout(() => setUser(null), 5000);
+    const unsubscribe = onAuthStateChanged(auth, u => {
+      clearTimeout(timeout);
+      setUser(u ?? null);
+    });
+    return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   if (!fontsLoaded || user === undefined) {

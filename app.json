@@ -2,7 +2,7 @@
   "expo": {
     "name": "Scrolltopsy",
     "slug": "scrolltopsy",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "orientation": "portrait",
     "backgroundColor": "#000000",
     "icon": "./assets/icon.png",
