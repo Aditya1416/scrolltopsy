@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(git *)",
+      "Bash(npx *)",
+      "Bash(./gradlew *)",
+      "PowerShell(Set-Location *)",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Item *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(firebase *)",
+      "PowerShell(gh *)",
+      "PowerShell(.*gradlew*)",
+      "mcp__ruflo__workflow_run",
+      "mcp__ruflo__workflow_status"
+    ]
+  }
+}
