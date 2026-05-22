@@ -57,6 +57,7 @@ const APP_MAP: Record<string, AppMeta> = {
   'flipboard.app': { name: 'Flipboard', category: 'news' },
   'com.pubg.mobile': { name: 'PUBG Mobile', category: 'games' },
   'com.supercell.clashofclans': { name: 'Clash of Clans', category: 'games' },
+  'com.supercell.clashroyale': { name: 'Clash Royale', category: 'games' },
   'com.mojang.minecraftpe': { name: 'Minecraft', category: 'games' },
   'com.tencent.ig': { name: 'BGMI', category: 'games' },
   'com.king.candycrushsaga': { name: 'Candy Crush', category: 'games' },
@@ -97,11 +98,56 @@ const APP_MAP: Record<string, AppMeta> = {
   'com.notion.android': { name: 'Notion', category: 'productivity' },
 };
 
-export function getAppMeta(packageName: string): AppMeta {
-  return APP_MAP[packageName] ?? {
-    name: packageName.split('.').pop() ?? packageName,
-    category: 'other',
-  };
+// Android ApplicationInfo.category constants (API 26+)
+const ANDROID_CAT_GAME = 0;
+const ANDROID_CAT_AUDIO = 1;
+const ANDROID_CAT_VIDEO = 2;
+const ANDROID_CAT_IMAGE = 3;
+const ANDROID_CAT_SOCIAL = 4;
+const ANDROID_CAT_NEWS = 5;
+const ANDROID_CAT_MAPS = 6;
+const ANDROID_CAT_PRODUCTIVITY = 7;
+
+export function mapAndroidCategory(cat: number): AppCategory {
+  switch (cat) {
+    case ANDROID_CAT_GAME: return 'games';
+    case ANDROID_CAT_AUDIO:
+    case ANDROID_CAT_VIDEO: return 'entertainment';
+    case ANDROID_CAT_IMAGE: return 'social';
+    case ANDROID_CAT_SOCIAL: return 'social';
+    case ANDROID_CAT_NEWS: return 'news';
+    case ANDROID_CAT_MAPS: return 'other';
+    case ANDROID_CAT_PRODUCTIVITY: return 'productivity';
+    default: return 'other';
+  }
+}
+
+function inferCategoryFromPackage(pkg: string): AppCategory {
+  const p = pkg.toLowerCase();
+  if (/game|play|puzzle|chess|word|quiz|trivia/.test(p)) return 'games';
+  if (/news|daily|times|express|herald|report|buzz/.test(p)) return 'news';
+  if (/video|music|stream|media|player|movie|film|tv\./.test(p)) return 'entertainment';
+  if (/shop|store|buy|mart|cart|deal|sale|fashion/.test(p)) return 'shopping';
+  if (/chat|message|talk|meet|call|voice|sms/.test(p)) return 'messaging';
+  if (/browser|web|surf/.test(p)) return 'browser';
+  if (/social|photo|share|snap|post|feed|story/.test(p)) return 'social';
+  return 'other';
+}
+
+export function getBestName(packageName: string, nativeLabel: string): string {
+  if (APP_MAP[packageName]) return APP_MAP[packageName].name;
+  return nativeLabel || (packageName.split('.').pop() ?? packageName);
+}
+
+export function getAppMeta(packageName: string, androidCategory?: number): AppMeta {
+  if (APP_MAP[packageName]) return APP_MAP[packageName];
+  const category = androidCategory !== undefined && androidCategory >= 0
+    ? mapAndroidCategory(androidCategory)
+    : inferCategoryFromPackage(packageName);
+  const name = packageName.split('.').filter(p => p.length > 2 && !/^(com|org|net|app|android|google|microsoft|samsung|huawei|xiaomi|oppo|vivo|realme|oneplus)$/.test(p)).pop()
+    ?? packageName.split('.').pop()
+    ?? packageName;
+  return { name: name.charAt(0).toUpperCase() + name.slice(1), category };
 }
 
 export const CATEGORY_LABELS: Record<AppCategory, string> = {

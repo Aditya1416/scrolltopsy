@@ -7,6 +7,7 @@ export interface AppUsage {
   appName: string;
   totalMs: number;
   lastUsed: number;
+  appCategory?: number;
 }
 
 export const usageStatsModule = {

@@ -41,6 +41,7 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
                         putString("appName", getAppLabel(pm, us.packageName))
                         putDouble("totalMs", us.totalTimeInForeground.toDouble())
                         putDouble("lastUsed", us.lastTimeUsed.toDouble())
+                        putInt("appCategory", getAndroidCategory(pm, us.packageName))
                     }
                     result.pushMap(map)
                 }
@@ -81,5 +82,13 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
             val info = pm.getApplicationInfo(pkg, 0)
             pm.getApplicationLabel(info).toString()
         } catch (e: Exception) { pkg.split(".").lastOrNull() ?: pkg }
+    }
+
+    private fun getAndroidCategory(pm: PackageManager, pkg: String): Int {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                pm.getApplicationInfo(pkg, 0).category
+            } else -1
+        } catch (e: Exception) { -1 }
     }
 }
