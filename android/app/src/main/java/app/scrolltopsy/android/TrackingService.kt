@@ -32,9 +32,14 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIF_ID, buildNotification("tracking active", ""))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, buildNotification("tracking active", ""),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIF_ID, buildNotification("tracking active", ""))
+        }
         handler.post(pollRunnable)
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
