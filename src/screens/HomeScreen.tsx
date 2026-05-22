@@ -229,6 +229,9 @@ export default function HomeScreen({ navigation, user }: Props) {
 
       <View style={[styles.bottomArea, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.ctaDivider} />
+        <TouchableOpacity style={styles.sessionBtn} onPress={() => navigation.navigate('Tracking')}>
+          <MonoText size={12} color={C.alarm}>→ track a session</MonoText>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.serviceBtn} onPress={handleToggleService} disabled={state.hasPermission === false}>
           <MonoText size={12} color={state.serviceRunning ? C.alarm : C.textSub}>
             {state.serviceRunning ? '● tracking active — tap to stop' : '○ start background tracking'}
@@ -267,5 +270,6 @@ const styles = StyleSheet.create({
   catBarFill: { height: '100%', backgroundColor: C.alarm },
   bottomArea: { alignItems: 'center', paddingHorizontal: 24 },
   ctaDivider: { width: '100%', height: 0.5, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 4 },
-  serviceBtn: { paddingVertical: 16, alignItems: 'center' },
+  sessionBtn: { paddingVertical: 14, alignItems: 'center' },
+  serviceBtn: { paddingVertical: 12, alignItems: 'center' },
 });
