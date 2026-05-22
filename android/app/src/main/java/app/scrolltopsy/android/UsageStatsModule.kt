@@ -64,7 +64,7 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
 
             val result = WritableNativeArray()
             usageMap.entries
-                .filter { it.value > 10_000L }
+                .filter { it.value > 10_000L && isUserApp(pm, it.key) }
                 .sortedByDescending { it.value }
                 .take(30)
                 .forEach { (pkg, ms) ->
@@ -122,5 +122,12 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
                 pm.getApplicationInfo(pkg, 0).category
             } else -1
         } catch (e: Exception) { -1 }
+    }
+
+    private fun isUserApp(pm: PackageManager, pkg: String): Boolean {
+        return try {
+            val flags = pm.getApplicationInfo(pkg, 0).flags
+            (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0
+        } catch (e: Exception) { true }
     }
 }
