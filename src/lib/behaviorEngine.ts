@@ -1,5 +1,5 @@
 import { AppUsage } from './nativeModules';
-import { getAppMeta, AppCategory, DOOMSCROLL_CATEGORIES } from './appCategories';
+import { getAppMeta, getBestName, AppCategory, DOOMSCROLL_CATEGORIES, mapAndroidCategory } from './appCategories';
 
 export interface UsageAnalysis {
   totalDoomMins: number;
@@ -29,22 +29,24 @@ export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
     }, {})
   );
 
-  const doomApps = deduped.filter(a => DOOMSCROLL_CATEGORIES.includes(getAppMeta(a.packageName).category));
+  const getMeta = (a: AppUsage) => getAppMeta(a.packageName, a.appCategory);
+
+  const doomApps = deduped.filter(a => DOOMSCROLL_CATEGORIES.includes(getMeta(a).category));
   const totalDoomMins = Math.round(doomApps.reduce((sum, a) => sum + a.totalMs, 0) / 60000);
 
   const byCategory: Record<string, number> = {};
   for (const app of doomApps) {
-    const cat = getAppMeta(app.packageName).category;
+    const cat = getMeta(app).category;
     byCategory[cat] = (byCategory[cat] ?? 0) + Math.round(app.totalMs / 60000);
   }
 
   const topApps = deduped
     .map(a => ({
-      appName: getAppMeta(a.packageName).name,
+      appName: getBestName(a.packageName, a.appName),
       mins: Math.round(a.totalMs / 60000),
-      category: getAppMeta(a.packageName).category,
+      category: getMeta(a).category,
     }))
-    .filter(a => DOOMSCROLL_CATEGORIES.includes(a.category as AppCategory))
+    .filter(a => a.mins >= 1)
     .sort((a, b) => b.mins - a.mins)
     .slice(0, 5);
 
