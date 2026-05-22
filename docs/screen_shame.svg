@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800">
+  <rect width="400" height="800" fill="#000000" />
+  
+  <text x="24" y="60" font-family="Courier New, monospace" font-size="12" fill="#444444">SCR-20260515</text>
+  <text x="24" y="80" font-family="Courier New, monospace" font-size="12" fill="#444444">session 3.84</text>
+  <text x="376" y="80" font-family="Inter, sans-serif" font-size="12" fill="#E24B4A" text-anchor="end">complete</text>
+
+  <text x="24" y="160" font-family="Inter, sans-serif" font-size="72" font-weight="bold" fill="#E24B4A" letter-spacing="-2">47</text>
+  <text x="24" y="200" font-family="Inter, sans-serif" font-size="16" fill="#666666">minutes unrecoverable</text>
+
+  <text x="24" y="280" font-family="Inter, sans-serif" font-size="12" fill="#666666">pages you could have read</text>
+  <text x="24" y="300" font-family="Inter, sans-serif" font-size="16" fill="#888888">70</text>
+
+  <text x="200" y="280" font-family="Inter, sans-serif" font-size="12" fill="#666666">steps you could have walked</text>
+  <text x="200" y="300" font-family="Inter, sans-serif" font-size="16" fill="#888888">4,700</text>
+
+  <text x="24" y="340" font-family="Inter, sans-serif" font-size="12" fill="#666666">lines of code</text>
+  <text x="24" y="360" font-family="Inter, sans-serif" font-size="16" fill="#888888">376</text>
+
+  <text x="200" y="340" font-family="Inter, sans-serif" font-size="12" fill="#666666">fraction of a power nap</text>
+  <text x="200" y="360" font-family="Inter, sans-serif" font-size="16" fill="#888888">235%</text>
+
+  <text x="24" y="440" font-family="Inter, sans-serif" font-size="14" fill="#aaaaaa">duration: 47 minutes. you were aware</text>
+  <text x="24" y="460" font-family="Inter, sans-serif" font-size="14" fill="#aaaaaa">this would happen. recurrence: expected.</text>
+
+  <line x1="24" y1="520" x2="376" y2="520" stroke="#222222" stroke-width="1" />
+  
+  <text x="24" y="560" font-family="Inter, sans-serif" font-size="14" fill="#666666">current session</text>
+  <text x="376" y="560" font-family="Inter, sans-serif" font-size="14" fill="#888888" text-anchor="end">47m</text>
+
+  <text x="24" y="600" font-family="Inter, sans-serif" font-size="14" fill="#666666">total today</text>
+  <text x="376" y="600" font-family="Inter, sans-serif" font-size="14" fill="#888888" text-anchor="end">1h 42m</text>
+
+  <text x="200" y="740" font-family="Inter, sans-serif" font-size="16" fill="#888888" text-anchor="middle" cursor="pointer">go again <tspan fill="#444">·</tspan> i'm done for now</text>
+</svg>

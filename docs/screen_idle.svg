@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800">
+  <rect width="400" height="800" fill="#000000" />
+  
+  <text x="24" y="60" font-family="Courier New, monospace" font-size="12" fill="#666666">SCR-20260515</text>
+  <text x="24" y="80" font-family="Courier New, monospace" font-size="12" fill="#666666">session 3.84</text>
+  <text x="360" y="70" font-family="sans-serif" font-size="16" fill="#666666">⚙</text>
+
+  <text x="24" y="160" font-family="Inter, sans-serif" font-size="72" font-weight="bold" fill="#E24B4A" letter-spacing="-2">42</text>
+  <text x="24" y="200" font-family="Inter, sans-serif" font-size="16" fill="#666666">min wasted today</text>
+
+  <line x1="24" y1="240" x2="376" y2="240" stroke="#222222" stroke-width="1" />
+
+  <text x="24" y="280" font-family="Inter, sans-serif" font-size="14" fill="#888888">14:02 — 14:18</text>
+  <text x="376" y="280" font-family="Inter, sans-serif" font-size="14" fill="#E24B4A" text-anchor="end">16m</text>
+
+  <text x="24" y="320" font-family="Inter, sans-serif" font-size="14" fill="#888888">11:45 — 11:57</text>
+  <text x="376" y="320" font-family="Inter, sans-serif" font-size="14" fill="#E24B4A" text-anchor="end">12m</text>
+
+  <text x="24" y="360" font-family="Inter, sans-serif" font-size="14" fill="#888888">09:12 — 09:26</text>
+  <text x="376" y="360" font-family="Inter, sans-serif" font-size="14" fill="#E24B4A" text-anchor="end">14m</text>
+
+  <line x1="24" y1="400" x2="376" y2="400" stroke="#222222" stroke-width="1" />
+
+  <text x="200" y="740" font-family="Inter, sans-serif" font-size="16" fill="#888888" text-anchor="middle" cursor="pointer">i'm about to doomscroll</text>
+</svg>
