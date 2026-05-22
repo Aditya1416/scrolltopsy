@@ -17,7 +17,19 @@ export interface BehaviorPattern {
 }
 
 export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
-  const doomApps = stats.filter(a => DOOMSCROLL_CATEGORIES.includes(getAppMeta(a.packageName).category));
+  // Deduplicate by packageName — native layer can return multiple entries per package
+  const deduped = Object.values(
+    stats.reduce<Record<string, AppUsage>>((acc, a) => {
+      if (acc[a.packageName]) {
+        acc[a.packageName] = { ...acc[a.packageName], totalMs: acc[a.packageName].totalMs + a.totalMs };
+      } else {
+        acc[a.packageName] = { ...a };
+      }
+      return acc;
+    }, {})
+  );
+
+  const doomApps = deduped.filter(a => DOOMSCROLL_CATEGORIES.includes(getAppMeta(a.packageName).category));
   const totalDoomMins = Math.round(doomApps.reduce((sum, a) => sum + a.totalMs, 0) / 60000);
 
   const byCategory: Record<string, number> = {};
@@ -26,13 +38,14 @@ export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
     byCategory[cat] = (byCategory[cat] ?? 0) + Math.round(app.totalMs / 60000);
   }
 
-  const topApps = stats
+  const topApps = deduped
     .map(a => ({
       appName: getAppMeta(a.packageName).name,
       mins: Math.round(a.totalMs / 60000),
       category: getAppMeta(a.packageName).category,
     }))
     .filter(a => DOOMSCROLL_CATEGORIES.includes(a.category as AppCategory))
+    .sort((a, b) => b.mins - a.mins)
     .slice(0, 5);
 
   return { totalDoomMins, byCategory, topApps };
