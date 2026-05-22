@@ -98,8 +98,8 @@ android {
         applicationId 'app.scrolltopsy.android'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "3.1.1"
+        versionCode 4
+        versionName "4.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -129,6 +129,14 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
+        }
+    }
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "armeabi-v7a"
+            universalApk true
         }
     }
     packagingOptions {
