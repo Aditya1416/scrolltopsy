@@ -1,0 +1,85 @@
+package app.scrolltopsy.android
+
+import android.app.AppOpsManager
+import android.app.usage.UsageStatsManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.Settings
+import com.facebook.react.bridge.*
+import java.util.Calendar
+
+class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+    override fun getName() = "UsageStats"
+
+    @ReactMethod fun hasPermission(promise: Promise) {
+        promise.resolve(isPermissionGranted())
+    }
+
+    @ReactMethod fun requestPermission() {
+        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        reactApplicationContext.startActivity(intent)
+    }
+
+    @ReactMethod fun getUsageStats(days: Double, promise: Promise) {
+        if (!isPermissionGranted()) { promise.reject("PERMISSION_DENIED", "Usage stats permission not granted"); return }
+        try {
+            val usm = reactApplicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -days.toInt()) }
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, cal.timeInMillis, System.currentTimeMillis())
+            val pm = reactApplicationContext.packageManager
+            val own = reactApplicationContext.packageName
+            val result = WritableNativeArray()
+            stats?.filter { it.packageName != own && it.totalTimeInForeground > 10000 }
+                ?.sortedByDescending { it.totalTimeInForeground }
+                ?.take(30)
+                ?.forEach { us ->
+                    val map = WritableNativeMap().apply {
+                        putString("packageName", us.packageName)
+                        putString("appName", getAppLabel(pm, us.packageName))
+                        putDouble("totalMs", us.totalTimeInForeground.toDouble())
+                        putDouble("lastUsed", us.lastTimeUsed.toDouble())
+                    }
+                    result.pushMap(map)
+                }
+            promise.resolve(result)
+        } catch (e: Exception) { promise.reject("ERROR", e.message) }
+    }
+
+    @ReactMethod fun getCurrentForegroundApp(promise: Promise) {
+        if (!isPermissionGranted()) { promise.resolve(null); return }
+        try {
+            val usm = reactApplicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val end = System.currentTimeMillis()
+            val start = end - 5 * 60 * 1000L
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, start, end)
+            val pm = reactApplicationContext.packageManager
+            val own = reactApplicationContext.packageName
+            val top = stats?.filter { it.packageName != own }?.maxByOrNull { it.lastTimeUsed }
+            if (top != null && top.lastTimeUsed > System.currentTimeMillis() - 30000) {
+                val map = WritableNativeMap().apply {
+                    putString("packageName", top.packageName)
+                    putString("appName", getAppLabel(pm, top.packageName))
+                    putDouble("lastUsed", top.lastTimeUsed.toDouble())
+                }
+                promise.resolve(map)
+            } else { promise.resolve(null) }
+        } catch (e: Exception) { promise.resolve(null) }
+    }
+
+    private fun isPermissionGranted(): Boolean {
+        val appOps = reactApplicationContext.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(), reactApplicationContext.packageName)
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    private fun getAppLabel(pm: PackageManager, pkg: String): String {
+        return try {
+            val info = pm.getApplicationInfo(pkg, 0)
+            pm.getApplicationLabel(info).toString()
+        } catch (e: Exception) { pkg.split(".").lastOrNull() ?: pkg }
+    }
+}

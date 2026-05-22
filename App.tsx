@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, StatusBar, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import {
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './src/lib/firebase';
 import { configureGoogleSignIn } from './src/lib/auth';
+import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import TrackingScreen from './src/screens/TrackingScreen';
 import ShameScreen from './src/screens/ShameScreen';
@@ -30,31 +31,25 @@ export default function App() {
 
   useEffect(() => {
     const timeout = setTimeout(() => setUser(null), 5000);
-    const unsubscribe = onAuthStateChanged(auth, u => {
-      clearTimeout(timeout);
-      setUser(u ?? null);
-    });
-    return () => { unsubscribe(); clearTimeout(timeout); };
+    const unsub = onAuthStateChanged(auth, u => { clearTimeout(timeout); setUser(u ?? null); });
+    return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
-  if (!fontsLoaded || user === undefined) {
-    return <View style={styles.splash} />;
+  if (!fontsLoaded || user === undefined) return <View style={styles.splash} />;
+
+  if (!user) {
+    return (
+      <SafeAreaProvider>
+        <LoginScreen onLoginSuccess={() => {}} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
       <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            cardStyle: { backgroundColor: '#000' },
-            gestureEnabled: false,
-          }}
-        >
-          <Stack.Screen name="Home">
-            {props => <HomeScreen {...props} user={user} />}
-          </Stack.Screen>
+        <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: '#000' }, gestureEnabled: false }}>
+          <Stack.Screen name="Home">{props => <HomeScreen {...props} user={user} />}</Stack.Screen>
           <Stack.Screen name="Tracking" component={TrackingScreen} />
           <Stack.Screen name="Shame" component={ShameScreen} />
         </Stack.Navigator>
@@ -63,6 +58,4 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: '#000000' },
-});
+const styles = StyleSheet.create({ splash: { flex: 1, backgroundColor: '#000000' } });
