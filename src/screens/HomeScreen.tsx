@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, Animated, AppState, Dimensions, PermissionsAndroid, Platform,
+  Animated, AppState, Dimensions, PermissionsAndroid, Platform,
   ScrollView, StatusBar, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -13,6 +13,7 @@ import { loadLearnedApps } from '../lib/learnedApps';
 import { quotaModule } from '../lib/quotaModule';
 import { CATEGORY_LABELS } from '../lib/appCategories';
 import MonoText from '../components/MonoText';
+import QuotaPickerModal from '../components/QuotaPickerModal';
 import SettingsModal from './SettingsModal';
 
 const CIRCUMFERENCE = 2 * Math.PI * 80;
@@ -41,6 +42,7 @@ export default function HomeScreen({ navigation, user }: Props) {
   const insets = useSafeAreaInsets();
   const [showSettings, setShowSettings] = useState(false);
   const [quotas, setQuotas] = useState<Record<string, number>>({});
+  const [quotaPicker, setQuotaPicker] = useState<{ packageName: string; appName: string } | null>(null);
   const [state, setState] = useState<State>({
     hasPermission: null,
     stats: [],
@@ -120,31 +122,19 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   const handleSetQuota = (packageName: string, appName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const current = quotas[packageName] || 0;
-    const presets = [15, 30, 60, 120];
-    Alert.alert(
-      `set limit · ${appName}`,
-      current > 0 ? `current limit: ${current}m — tap to change` : 'no limit set · tap to add one',
-      [
-        ...presets.map(mins => ({
-          text: mins < 60 ? `${mins}m` : `${mins / 60}h`,
-          onPress: async () => {
-            await quotaModule.setQuota(packageName, mins);
-            setQuotas(q => ({ ...q, [packageName]: mins }));
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-        })),
-        ...(current > 0 ? [{
-          text: 'remove limit',
-          style: 'destructive' as const,
-          onPress: async () => {
-            await quotaModule.clearQuota(packageName);
-            setQuotas(q => { const n = { ...q }; delete n[packageName]; return n; });
-          },
-        }] : []),
-        { text: 'cancel', style: 'cancel' as const },
-      ]
-    );
+    setQuotaPicker({ packageName, appName });
+  };
+
+  const handleQuotaSet = async (limitMins: number) => {
+    if (!quotaPicker) return;
+    await quotaModule.setQuota(quotaPicker.packageName, limitMins);
+    setQuotas(q => ({ ...q, [quotaPicker.packageName]: limitMins }));
+  };
+
+  const handleQuotaRemove = async () => {
+    if (!quotaPicker) return;
+    await quotaModule.clearQuota(quotaPicker.packageName);
+    setQuotas(q => { const n = { ...q }; delete n[quotaPicker.packageName]; return n; });
   };
 
   const handleRequestPermission = () => {
@@ -298,6 +288,15 @@ export default function HomeScreen({ navigation, user }: Props) {
         visible={showSettings}
         onClose={() => { setShowSettings(false); load(); }}
         user={user}
+      />
+
+      <QuotaPickerModal
+        visible={quotaPicker !== null}
+        appName={quotaPicker?.appName ?? ''}
+        currentLimit={quotaPicker ? (quotas[quotaPicker.packageName] || 0) : 0}
+        onSet={handleQuotaSet}
+        onRemove={handleQuotaRemove}
+        onClose={() => setQuotaPicker(null)}
       />
     </View>
   );
