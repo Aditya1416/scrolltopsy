@@ -1,14 +1,17 @@
 package app.scrolltopsy.android
 
 import android.app.*
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import java.util.Calendar
 
 class TrackingService : Service() {
     companion object {
@@ -21,7 +24,7 @@ class TrackingService : Service() {
     private val pollRunnable = object : Runnable {
         override fun run() {
             updateNotification()
-            handler.postDelayed(this, 30_000L)
+            handler.postDelayed(this, 10_000L)
         }
     }
 
@@ -32,11 +35,12 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = buildNotification("scrolltopsy", "calculating today's usage…")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIF_ID, buildNotification("tracking active", ""),
+            startForeground(NOTIF_ID, notification,
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
-            startForeground(NOTIF_ID, buildNotification("tracking active", ""))
+            startForeground(NOTIF_ID, notification)
         }
         handler.post(pollRunnable)
         return START_NOT_STICKY
@@ -50,29 +54,107 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun updateNotification() {
-        val app = getCurrentApp()
-        val title = if (app != null) "currently: ${app.first}" else "scrolltopsy watching"
-        val text = if (app != null) "tap to see your damage" else "no doomscrolling detected"
-        val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notifManager.notify(NOTIF_ID, buildNotification(title, text))
-    }
+    // ── Core: accurate usage from UsageEvents ─────────────────────────────────
 
-    private fun getCurrentApp(): Pair<String, String>? {
+    private fun getAccurateDayUsage(): Map<String, Long> {
         return try {
             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val end = System.currentTimeMillis()
-            val start = end - 5 * 60 * 1000L
-            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, start, end)
-            val top = stats?.filter { it.packageName != packageName }?.maxByOrNull { it.lastTimeUsed }
-            if (top != null && top.lastTimeUsed > System.currentTimeMillis() - 60000) {
-                val label = try {
-                    val info = packageManager.getApplicationInfo(top.packageName, 0)
-                    packageManager.getApplicationLabel(info).toString()
-                } catch (e: Exception) { top.packageName }
-                Pair(label, top.packageName)
-            } else null
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+            val now = System.currentTimeMillis()
+            val events = usm.queryEvents(cal.timeInMillis, now) ?: return emptyMap()
+
+            val usageMap = mutableMapOf<String, Long>()
+            val foregroundSince = mutableMapOf<String, Long>()
+            val event = UsageEvents.Event()
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName ?: continue
+                if (pkg == packageName) continue
+                when (event.eventType) {
+                    UsageEvents.Event.MOVE_TO_FOREGROUND ->
+                        foregroundSince[pkg] = event.timeStamp
+                    UsageEvents.Event.MOVE_TO_BACKGROUND ->
+                        foregroundSince.remove(pkg)?.let { since ->
+                            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (event.timeStamp - since)
+                        }
+                }
+            }
+            // add still-active apps
+            foregroundSince.forEach { (pkg, since) ->
+                usageMap[pkg] = (usageMap[pkg] ?: 0L) + (now - since)
+            }
+            usageMap
+        } catch (e: Exception) { emptyMap() }
+    }
+
+    private fun getCurrentForegroundPkg(): String? {
+        return try {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val now = System.currentTimeMillis()
+            val events = usm.queryEvents(now - 5 * 60_000L, now) ?: return null
+            var currentFg: String? = null
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName ?: continue
+                if (pkg == packageName) continue
+                when (event.eventType) {
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> currentFg = pkg
+                    UsageEvents.Event.MOVE_TO_BACKGROUND ->
+                        if (currentFg == pkg) currentFg = null
+                }
+            }
+            currentFg
         } catch (e: Exception) { null }
+    }
+
+    // ── Notification ──────────────────────────────────────────────────────────
+
+    private fun updateNotification() {
+        try {
+            val pm = packageManager
+            val usage = getAccurateDayUsage()
+            val currentPkg = getCurrentForegroundPkg()
+            val currentLabel = currentPkg?.let { getAppLabel(pm, it) }
+            val currentMs = currentPkg?.let { usage[it] } ?: 0L
+
+            val top3 = usage.entries
+                .filter { it.key != packageName }
+                .sortedByDescending { it.value }
+                .take(3)
+                .joinToString("  ·  ") { "${getAppLabel(pm, it.key)} ${formatTime(it.value)}" }
+
+            val title = if (currentLabel != null)
+                "now: $currentLabel  ·  ${formatTime(currentMs)}"
+            else
+                "scrolltopsy  ·  watching"
+
+            val body = top3.ifEmpty { "no screen time recorded yet" }
+
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIF_ID, buildNotification(title, body))
+        } catch (_: Exception) {}
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun formatTime(ms: Long): String {
+        val mins = ms / 60000
+        return when {
+            mins == 0L -> "<1m"
+            mins >= 60 -> "${mins / 60}h${(mins % 60).let { if (it > 0) "${it}m" else "" }}"
+            else -> "${mins}m"
+        }
+    }
+
+    private fun getAppLabel(pm: PackageManager, pkg: String): String {
+        return try {
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: Exception) { pkg.split(".").lastOrNull() ?: pkg }
     }
 
     private fun buildNotification(title: String, text: String): Notification {
@@ -81,20 +163,27 @@ class TrackingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentIntent(pending)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setColor(0xE24B4A.toInt())
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Live Tracking", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Shows currently tracked app"
+            val ch = NotificationChannel(
+                CHANNEL_ID, "Live Usage Tracking",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Live screen time — updates every 10s"
                 setShowBadge(false)
             }
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .createNotificationChannel(ch)
         }
     }
 }

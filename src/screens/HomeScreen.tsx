@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../theme';
 import { usageStatsModule, trackingServiceModule, AppUsage } from '../lib/nativeModules';
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
+import { loadLearnedApps } from '../lib/learnedApps';
 import { CATEGORY_LABELS } from '../lib/appCategories';
 import MonoText from '../components/MonoText';
 import SettingsModal from './SettingsModal';
@@ -90,8 +91,9 @@ export default function HomeScreen({ navigation, user }: Props) {
     }
   }, []);
 
+  useEffect(() => { loadLearnedApps().then(load); }, []);
+
   useEffect(() => {
-    load();
     const navUnsub = navigation.addListener('focus', load);
     const appStateSub = AppState.addEventListener('change', (next) => {
       if (next === 'active') load();
