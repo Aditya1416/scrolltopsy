@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated, AppState, Dimensions, PermissionsAndroid, Platform, ScrollView, StatusBar,
-  StyleSheet, TouchableOpacity, View,
+  Alert, Animated, AppState, Dimensions, PermissionsAndroid, Platform,
+  ScrollView, StatusBar, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
-import Svg, { Circle, Defs, Pattern, Rect, Circle as SvgDot } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../theme';
 import { usageStatsModule, trackingServiceModule, AppUsage } from '../lib/nativeModules';
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
 import { loadLearnedApps } from '../lib/learnedApps';
+import { quotaModule } from '../lib/quotaModule';
 import { CATEGORY_LABELS } from '../lib/appCategories';
 import MonoText from '../components/MonoText';
 import SettingsModal from './SettingsModal';
 
-const { width } = Dimensions.get('window');
 const CIRCUMFERENCE = 2 * Math.PI * 80;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -25,14 +25,14 @@ interface State {
   stats: AppUsage[];
   totalDoomMins: number;
   byCategory: Record<string, number>;
-  topApps: Array<{ appName: string; mins: number; category: string }>;
+  topApps: Array<{ packageName: string; appName: string; mins: number; category: string }>;
   scrolltype: string;
   risk: 'low' | 'medium' | 'high';
   serviceRunning: boolean;
 }
 
 const RISK_COLOR: Record<string, string> = {
-  low: C.textSub,
+  low: '#666666',
   medium: '#c8953a',
   high: C.alarm,
 };
@@ -40,6 +40,7 @@ const RISK_COLOR: Record<string, string> = {
 export default function HomeScreen({ navigation, user }: Props) {
   const insets = useSafeAreaInsets();
   const [showSettings, setShowSettings] = useState(false);
+  const [quotas, setQuotas] = useState<Record<string, number>>({});
   const [state, setState] = useState<State>({
     hasPermission: null,
     stats: [],
@@ -63,9 +64,10 @@ export default function HomeScreen({ navigation, user }: Props) {
         return;
       }
 
-      const [stats, running] = await Promise.all([
+      const [stats, running, q] = await Promise.all([
         usageStatsModule.getUsageStats(1),
         trackingServiceModule.isRunning(),
+        quotaModule.getAllQuotas(),
       ]);
 
       const { totalDoomMins, byCategory, topApps } = analyzeUsage(stats);
@@ -75,6 +77,7 @@ export default function HomeScreen({ navigation, user }: Props) {
       const risk = predictRisk(totalDoomMins);
 
       setState({ hasPermission: true, stats, totalDoomMins, byCategory, topApps, scrolltype, risk, serviceRunning: running });
+      setQuotas(q);
 
       const progress = Math.min(totalDoomMins / 120, 1);
       Animated.timing(arcAnim, {
@@ -113,6 +116,35 @@ export default function HomeScreen({ navigation, user }: Props) {
     }
     const running = await trackingServiceModule.isRunning();
     setState(s => ({ ...s, serviceRunning: running }));
+  };
+
+  const handleSetQuota = (packageName: string, appName: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const current = quotas[packageName] || 0;
+    const presets = [15, 30, 60, 120];
+    Alert.alert(
+      `set limit · ${appName}`,
+      current > 0 ? `current limit: ${current}m — tap to change` : 'no limit set · tap to add one',
+      [
+        ...presets.map(mins => ({
+          text: mins < 60 ? `${mins}m` : `${mins / 60}h`,
+          onPress: async () => {
+            await quotaModule.setQuota(packageName, mins);
+            setQuotas(q => ({ ...q, [packageName]: mins }));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        })),
+        ...(current > 0 ? [{
+          text: 'remove limit',
+          style: 'destructive' as const,
+          onPress: async () => {
+            await quotaModule.clearQuota(packageName);
+            setQuotas(q => { const n = { ...q }; delete n[packageName]; return n; });
+          },
+        }] : []),
+        { text: 'cancel', style: 'cancel' as const },
+      ]
+    );
   };
 
   const handleRequestPermission = () => {
@@ -188,27 +220,45 @@ export default function HomeScreen({ navigation, user }: Props) {
 
             {state.topApps.length > 0 && (
               <View style={styles.topAppsSection}>
-                <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>top offenders today</MonoText>
-                {state.topApps.map((app, i) => (
-                  <Animated.View
-                    key={`${app.appName}-${i}`}
-                    style={[
-                      styles.appRow,
-                      {
-                        opacity: listAnims[i],
-                        transform: [{ translateX: listAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
-                      },
-                    ]}
-                  >
-                    <View style={styles.appLeft}>
-                      <MonoText size={11} color={C.text}>{app.appName}</MonoText>
-                      <View style={[styles.catBadge, app.category === 'social' || app.category === 'entertainment' ? styles.catBadgeRed : {}]}>
-                        <MonoText size={8} color={C.textMuted}>{CATEGORY_LABELS[app.category as keyof typeof CATEGORY_LABELS] ?? app.category}</MonoText>
-                      </View>
-                    </View>
-                    <MonoText size={11} color={app.mins > 60 ? C.alarm : C.textSub}>{`${app.mins}m`}</MonoText>
-                  </Animated.View>
-                ))}
+                <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>
+                  top offenders today  <MonoText size={8} color='#444444'>· tap to set limit</MonoText>
+                </MonoText>
+                {state.topApps.map((app, i) => {
+                  const quota = quotas[app.packageName] || 0;
+                  const isOver = quota > 0 && app.mins > quota;
+                  const overMins = isOver ? app.mins - quota : 0;
+                  return (
+                    <Animated.View
+                      key={`${app.appName}-${i}`}
+                      style={[
+                        styles.appRow,
+                        {
+                          opacity: listAnims[i],
+                          transform: [{ translateX: listAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
+                        },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={styles.appLeft}
+                        onPress={() => handleSetQuota(app.packageName, app.appName)}
+                        activeOpacity={0.6}
+                      >
+                        <MonoText size={11} color={isOver ? C.alarm : C.text}>{app.appName}</MonoText>
+                        <View style={[styles.catBadge, app.category === 'social' || app.category === 'entertainment' ? styles.catBadgeRed : {}]}>
+                          <MonoText size={8} color={C.textMuted}>{CATEGORY_LABELS[app.category as keyof typeof CATEGORY_LABELS] ?? app.category}</MonoText>
+                        </View>
+                        {quota > 0 && (
+                          <View style={[styles.quotaBadge, isOver ? styles.quotaBadgeOver : {}]}>
+                            <MonoText size={8} color={isOver ? C.alarm : '#888888'}>
+                              {isOver ? `+${overMins}m` : `≤${quota}m`}
+                            </MonoText>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      <MonoText size={11} color={isOver ? C.alarm : app.mins > 60 ? '#c8953a' : '#aaaaaa'}>{`${app.mins}m`}</MonoText>
+                    </Animated.View>
+                  );
+                })}
               </View>
             )}
 
@@ -219,11 +269,11 @@ export default function HomeScreen({ navigation, user }: Props) {
                   .sort((a, b) => b[1] - a[1])
                   .map(([cat, mins]) => (
                     <View key={cat} style={styles.catRow}>
-                      <MonoText size={10} color={C.textSub}>{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] ?? cat}</MonoText>
+                      <MonoText size={10} color='#888888'>{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] ?? cat}</MonoText>
                       <View style={styles.catBarTrack}>
                         <View style={[styles.catBarFill, { width: `${Math.min((mins / Math.max(state.totalDoomMins, 1)) * 100, 100)}%` }]} />
                       </View>
-                      <MonoText size={10} color={C.textSub} style={{ width: 36, textAlign: 'right' }}>{`${mins}m`}</MonoText>
+                      <MonoText size={10} color='#888888' style={{ width: 36, textAlign: 'right' }}>{`${mins}m`}</MonoText>
                     </View>
                   ))}
               </View>
@@ -238,7 +288,7 @@ export default function HomeScreen({ navigation, user }: Props) {
           <MonoText size={12} color={C.alarm}>→ track a session</MonoText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.serviceBtn} onPress={handleToggleService} disabled={state.hasPermission === false}>
-          <MonoText size={12} color={state.serviceRunning ? C.alarm : C.textSub}>
+          <MonoText size={12} color={state.serviceRunning ? C.alarm : '#aaaaaa'}>
             {state.serviceRunning ? '● tracking active — tap to stop' : '○ start background tracking'}
           </MonoText>
         </TouchableOpacity>
@@ -269,6 +319,8 @@ const styles = StyleSheet.create({
   appLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   catBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.04)' },
   catBadgeRed: { backgroundColor: 'rgba(226,75,74,0.08)' },
+  quotaBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.04)' },
+  quotaBadgeOver: { backgroundColor: 'rgba(226,75,74,0.12)' },
   catBreakdown: { width: '100%', marginTop: 24 },
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   catBarTrack: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 10, overflow: 'hidden' },

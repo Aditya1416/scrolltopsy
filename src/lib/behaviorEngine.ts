@@ -5,7 +5,7 @@ import { saveLearnedApps } from './learnedApps';
 export interface UsageAnalysis {
   totalDoomMins: number;
   byCategory: Record<string, number>;
-  topApps: Array<{ appName: string; mins: number; category: string }>;
+  topApps: Array<{ packageName: string; appName: string; mins: number; category: string }>;
 }
 
 export interface BehaviorPattern {
@@ -52,7 +52,7 @@ export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
     .filter(a => a.mins >= 1)
     .sort((a, b) => b.mins - a.mins)
     .slice(0, 5)
-    .map(({ appName, mins, category }) => ({ appName, mins, category }));
+    .map(({ packageName, appName, mins, category }) => ({ packageName, appName, mins, category }));
 
   // Persist newly encountered apps for self-learning
   saveLearnedApps(
