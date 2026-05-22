@@ -1,5 +1,6 @@
 import { AppUsage } from './nativeModules';
 import { getAppMeta, getBestName, AppCategory, DOOMSCROLL_CATEGORIES, mapAndroidCategory } from './appCategories';
+import { saveLearnedApps } from './learnedApps';
 
 export interface UsageAnalysis {
   totalDoomMins: number;
@@ -40,15 +41,25 @@ export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
     byCategory[cat] = (byCategory[cat] ?? 0) + Math.round(app.totalMs / 60000);
   }
 
-  const topApps = deduped
-    .map(a => ({
-      appName: getBestName(a.packageName, a.appName),
-      mins: Math.round(a.totalMs / 60000),
-      category: getMeta(a).category,
-    }))
+  const mapped = deduped.map(a => ({
+    packageName: a.packageName,
+    appName: getBestName(a.packageName, a.appName),
+    mins: Math.round(a.totalMs / 60000),
+    category: getMeta(a).category,
+  }));
+
+  const topApps = mapped
     .filter(a => a.mins >= 1)
     .sort((a, b) => b.mins - a.mins)
-    .slice(0, 5);
+    .slice(0, 5)
+    .map(({ appName, mins, category }) => ({ appName, mins, category }));
+
+  // Persist newly encountered apps for self-learning
+  saveLearnedApps(
+    mapped
+      .filter(a => a.mins >= 1)
+      .map(a => ({ packageName: a.packageName, name: a.appName, category: a.category as AppCategory }))
+  );
 
   return { totalDoomMins, byCategory, topApps };
 }
