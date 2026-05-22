@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, ScrollView, StatusBar,
+  Animated, AppState, Dimensions, ScrollView, StatusBar,
   StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect, Circle as SvgDot } from 'react-native-svg';
@@ -52,64 +52,52 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   const arcAnim = useRef(new Animated.Value(CIRCUMFERENCE)).current;
   const greetingOpacity = useRef(new Animated.Value(0)).current;
-  const cardRotX = useRef(new Animated.Value(0)).current;
-  const cardRotY = useRef(new Animated.Value(0)).current;
   const listAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
 
   const load = useCallback(async () => {
-    const perm = await usageStatsModule.hasPermission();
-    if (!perm) {
+    try {
+      const perm = await usageStatsModule.hasPermission();
+      if (!perm) {
+        setState(s => ({ ...s, hasPermission: false }));
+        return;
+      }
+
+      const [stats, running] = await Promise.all([
+        usageStatsModule.getUsageStats(1),
+        trackingServiceModule.isRunning(),
+      ]);
+
+      const { totalDoomMins, byCategory, topApps } = analyzeUsage(stats);
+      const topCat = getTopCategory(byCategory);
+      const hour = new Date().getHours();
+      const scrolltype = classifyScrolltype(totalDoomMins, hour, topCat);
+      const risk = predictRisk(totalDoomMins);
+
+      setState({ hasPermission: true, stats, totalDoomMins, byCategory, topApps, scrolltype, risk, serviceRunning: running });
+
+      const progress = Math.min(totalDoomMins / 120, 1);
+      Animated.timing(arcAnim, {
+        toValue: CIRCUMFERENCE - progress * CIRCUMFERENCE,
+        duration: 1200,
+        useNativeDriver: false,
+      }).start();
+      Animated.timing(greetingOpacity, { toValue: 1, duration: 400, delay: 200, useNativeDriver: true }).start();
+      listAnims.forEach((anim, i) => {
+        Animated.timing(anim, { toValue: 1, duration: 280, delay: 400 + i * 70, useNativeDriver: true }).start();
+      });
+    } catch (e) {
       setState(s => ({ ...s, hasPermission: false }));
-      return;
     }
-
-    const [stats, running] = await Promise.all([
-      usageStatsModule.getUsageStats(1),
-      trackingServiceModule.isRunning(),
-    ]);
-
-    const { totalDoomMins, byCategory, topApps } = analyzeUsage(stats);
-    const topCat = getTopCategory(byCategory);
-    const hour = new Date().getHours();
-    const scrolltype = classifyScrolltype(totalDoomMins, hour, topCat);
-    const risk = predictRisk(totalDoomMins);
-
-    setState({ hasPermission: true, stats, totalDoomMins, byCategory, topApps, scrolltype, risk, serviceRunning: running });
-
-    const progress = Math.min(totalDoomMins / 120, 1);
-    Animated.timing(arcAnim, {
-      toValue: CIRCUMFERENCE - progress * CIRCUMFERENCE,
-      duration: 1200,
-      useNativeDriver: false,
-    }).start();
-    Animated.timing(greetingOpacity, { toValue: 1, duration: 400, delay: 200, useNativeDriver: true }).start();
-    listAnims.forEach((anim, i) => {
-      Animated.timing(anim, { toValue: 1, duration: 280, delay: 400 + i * 70, useNativeDriver: true }).start();
-    });
   }, []);
 
   useEffect(() => {
     load();
-    const unsub = navigation.addListener('focus', load);
-    return unsub;
+    const navUnsub = navigation.addListener('focus', load);
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') load();
+    });
+    return () => { navUnsub(); appStateSub.remove(); };
   }, [navigation, load]);
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(cardRotX, { toValue: 1, duration: 3000, useNativeDriver: true }),
-        Animated.timing(cardRotX, { toValue: -1, duration: 3000, useNativeDriver: true }),
-        Animated.timing(cardRotX, { toValue: 0, duration: 3000, useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(cardRotY, { toValue: 1, duration: 4000, useNativeDriver: true }),
-        Animated.timing(cardRotY, { toValue: -1, duration: 4000, useNativeDriver: true }),
-        Animated.timing(cardRotY, { toValue: 0, duration: 2000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   const handleToggleService = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -130,26 +118,9 @@ export default function HomeScreen({ navigation, user }: Props) {
   const timeLabel = hour < 6 ? 'still up' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 22 ? 'evening' : 'still up';
   const firstName = user?.displayName?.split(' ')[0]?.toLowerCase() ?? '';
 
-  const cardTransform = [
-    { perspective: 800 },
-    { rotateX: cardRotX.interpolate({ inputRange: [-1, 1], outputRange: ['-1.5deg', '1.5deg'] }) },
-    { rotateY: cardRotY.interpolate({ inputRange: [-1, 1], outputRange: ['-2deg', '2deg'] }) },
-  ];
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <Svg width={width} height="100%" style={StyleSheet.absoluteFillObject}>
-          <Defs>
-            <Pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-              <SvgDot cx="1" cy="1" r="0.8" fill="rgba(255,255,255,0.06)" />
-            </Pattern>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#dots)" />
-        </Svg>
-      </View>
+      <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
 
       <View style={styles.topBar}>
         <MonoText size={9} color={C.textSub}>
@@ -160,7 +131,7 @@ export default function HomeScreen({ navigation, user }: Props) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {firstName ? (
           <Animated.View style={{ opacity: greetingOpacity, marginBottom: 8 }}>
             <MonoText italic size={13} color={C.textSub}>{`good ${timeLabel}, ${firstName}.`}</MonoText>
@@ -179,7 +150,7 @@ export default function HomeScreen({ navigation, user }: Props) {
           </View>
         ) : (
           <>
-            <Animated.View style={[styles.arcCard, { transform: cardTransform }]}>
+            <View style={styles.arcCard}>
               <View style={styles.arcWrapper}>
                 <Svg width={200} height={200} viewBox="0 0 200 200">
                   <Circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" />
@@ -208,7 +179,7 @@ export default function HomeScreen({ navigation, user }: Props) {
                   <MonoText size={9} color={C.textMuted} style={{ marginLeft: 12 }}>· {state.scrolltype}</MonoText>
                 ) : null}
               </View>
-            </Animated.View>
+            </View>
 
             {state.topApps.length > 0 && (
               <View style={styles.topAppsSection}>
@@ -276,6 +247,7 @@ export default function HomeScreen({ navigation, user }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
+  scrollView: { flex: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12 },
   scroll: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 24 },
   permBox: { width: '100%', marginTop: 40, padding: 20, borderWidth: 0.5, borderColor: 'rgba(226,75,74,0.3)', borderRadius: 4 },
