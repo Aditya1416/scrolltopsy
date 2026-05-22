@@ -24,6 +24,7 @@ class MainApplication : Application(), ReactApplication {
           add(UsageStatsPackage())
           add(TrackingServicePackage())
           add(OverlayPackage())
+          add(QuotaPackage())
         }
     )
   }
