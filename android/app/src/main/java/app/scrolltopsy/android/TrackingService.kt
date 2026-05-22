@@ -123,7 +123,7 @@ class TrackingService : Service() {
             val currentMs = currentPkg?.let { usage[it] } ?: 0L
 
             val top3 = usage.entries
-                .filter { it.key != packageName }
+                .filter { it.key != packageName && isUserApp(pm, it.key) }
                 .sortedByDescending { it.value }
                 .take(3)
                 .joinToString("  ·  ") { "${getAppLabel(pm, it.key)} ${formatTime(it.value)}" }
@@ -155,6 +155,13 @@ class TrackingService : Service() {
         return try {
             pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
         } catch (_: Exception) { pkg.split(".").lastOrNull() ?: pkg }
+    }
+
+    private fun isUserApp(pm: PackageManager, pkg: String): Boolean {
+        return try {
+            val flags = pm.getApplicationInfo(pkg, 0).flags
+            (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0
+        } catch (_: Exception) { true }
     }
 
     private fun buildNotification(title: String, text: String): Notification {

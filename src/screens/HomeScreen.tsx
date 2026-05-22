@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated, AppState, Dimensions, ScrollView, StatusBar,
+  Animated, AppState, Dimensions, PermissionsAndroid, Platform, ScrollView, StatusBar,
   StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect, Circle as SvgDot } from 'react-native-svg';
@@ -106,6 +106,9 @@ export default function HomeScreen({ navigation, user }: Props) {
     if (state.serviceRunning) {
       await trackingServiceModule.stop();
     } else {
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS');
+      }
       await trackingServiceModule.start();
     }
     const running = await trackingServiceModule.isRunning();
