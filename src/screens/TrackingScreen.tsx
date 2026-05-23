@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F } from '../theme';
 import { saveSession } from '../lib/storage';
+import { syncToFirestore } from '../lib/sync';
+import { auth } from '../lib/firebase';
 import MonoText from '../components/MonoText';
 
 const SESSION_KEY = 'sct_session_start';
@@ -68,6 +70,10 @@ export default function TrackingScreen({ navigation }: Props) {
     const durationMins = Math.max(1, Math.ceil(elapsed / 60));
     await saveSession(durationMins);
     await AsyncStorage.removeItem(SESSION_KEY);
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      syncToFirestore(currentUser.uid).catch(() => {});
+    }
     navigation.replace('Shame', { durationMins });
   };
 
