@@ -12,6 +12,7 @@ import WeekView from './pages/WeekView';
 import { saveSession, getSessions, getProfile, replaceProfile } from './lib/storage';
 import { acceptPrivacyAndComplete, signOut } from './lib/auth';
 import { auth, db } from './lib/firebase';
+import { syncToFirestore, restoreFromFirestore } from './lib/sync';
 import { ai } from './lib/ai';
 import { analysePatterns } from './lib/learningEngine';
 import { detectTopApp } from './lib/usageStats';
@@ -52,6 +53,7 @@ function MainApp() {
         if (userDoc.exists() && userDoc.data().privacyPolicyAcceptedAt) {
           sessionStorage.setItem('sct_consent', firebaseUser.uid);
           setUser(firebaseUser);
+          restoreFromFirestore(firebaseUser.uid).catch(() => {});
         } else {
           setPendingConsentUser(firebaseUser);
           setCurrentView('consent');
@@ -89,6 +91,11 @@ function MainApp() {
 
     setLastSessionDuration(durationSeconds);
     await saveSession(mins);
+
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      syncToFirestore(currentUser.uid).catch(() => {});
+    }
 
     const sessions = await getSessions();
 

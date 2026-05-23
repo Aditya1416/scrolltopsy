@@ -9,6 +9,15 @@ import { maybeAnalysePatternsToday, getPersonalisedGreeting } from './lib/learni
 import { hasUsagePermission, requestUsagePermission } from './lib/usageStats';
 import { getAppForSession } from './lib/appData';
 
+const openPrivacyPolicy = async () => {
+  const url = 'https://scrolltopsy.vercel.app/privacy';
+  try {
+    window.open(url, '_system');
+  } catch (error) {
+    alert('Visit scrolltopsy.vercel.app/privacy in your browser.');
+  }
+};
+
 const CIRCUMFERENCE = 2 * Math.PI * 88;
 
 const APP_EMOJIS = {
@@ -224,6 +233,15 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
               <>
                 <div className="bs-user-name">{user.displayName}</div>
                 <div className="bs-user-email">{maskEmail(user.email)}</div>
+                <div style={{
+                  fontFamily: 'monospace',
+                  fontSize: '10px',
+                  color: user?.emailVerified ? '#1D9E75' : '#E24B4A',
+                  marginTop: '4px',
+                  marginBottom: '4px',
+                }}>
+                  {user?.emailVerified ? '✓ verified' : '⚠ not verified — check email'}
+                </div>
                 <button className="bs-row" onClick={handleSignOut}>sign out</button>
                 <button className="bs-row" onClick={handleBackup}>back up my data</button>
                 {backupStatus && <div className="bs-token">{backupStatus}</div>}
@@ -248,7 +266,7 @@ export default function IdleHome({ onStartTracking, onShowPrivacy, user }) {
                     enable app detection →
                   </button>
                 )}
-                <button className="bs-row" onClick={() => { setShowSettings(false); onShowPrivacy(); }}>
+                <button className="bs-row" onClick={() => { setShowSettings(false); openPrivacyPolicy(); }}>
                   privacy policy
                 </button>
               </>
