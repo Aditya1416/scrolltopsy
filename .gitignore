@@ -30,7 +30,14 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Windows
+Thumbs.db
+
 # local env files
+.env
+.env.local
+.env.production
+.env.staging
 .env*.local
 
 # typescript
@@ -46,6 +53,21 @@ android/app/.cxx/
 android/.gradle/
 android/app/debug.keystore
 
+# android secrets — never commit
+android/app/google-services.json
+google-services.json
+GoogleService-Info.plist
+android/*.keystore
+android/scrolltopsy-release.keystore
+
+# test coverage
+coverage/
+.nyc_output/
+
+# logs
+*.log
+
 # keep releases
 !releases/
 releases/*.apk
+releases/*.idsig

@@ -84,6 +84,10 @@ export async function signOut() {
 export async function deleteAccount(uid) {
   try {
     await deleteDoc(doc(db, 'users', uid));
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      await currentUser.delete().catch(() => {});
+    }
     await signOut();
   } catch (error) {
     console.error('[auth] deleteAccount error:', error);
