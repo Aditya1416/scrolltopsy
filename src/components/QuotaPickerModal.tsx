@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../theme';
 import MonoText from './MonoText';
 
@@ -21,6 +22,7 @@ const PRESETS = [
 ];
 
 export default function QuotaPickerModal({ visible, appName, currentLimit, onSet, onRemove, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   const [hours, setHours] = useState(0);
   const [mins, setMins] = useState(0);
 
@@ -77,7 +79,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + 40 }]}>
 
         <View style={styles.handle} />
 
