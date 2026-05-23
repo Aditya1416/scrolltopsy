@@ -49,7 +49,7 @@ export default function ShameReport({
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const minutes = Math.ceil(durationSeconds / 60);
+  const minutes = Math.max(1, Math.ceil(durationSeconds / 60));
   const shameContext = getPersonalisedShameContext(minutes);
   const suffix = getContextualSuffix(shameContext);
   const isAnalysing = shameMessage === 'Analyzing behavior...';
