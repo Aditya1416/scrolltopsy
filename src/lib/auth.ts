@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   signOut as fbSignOut,
+  sendEmailVerification,
 } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, deleteDoc, serverTimestamp,
@@ -52,6 +53,9 @@ export async function acceptPrivacy(user: any): Promise<void> {
     totalSessions: 0,
     totalMins: 0,
   }, { merge: true });
+  if (user && !user.emailVerified) {
+    await sendEmailVerification(user).catch(() => {});
+  }
 }
 
 export async function signOut(): Promise<void> {
@@ -63,5 +67,9 @@ export async function signOut(): Promise<void> {
 
 export async function deleteAccount(uid: string): Promise<void> {
   await deleteDoc(doc(db, 'users', uid));
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    await currentUser.delete().catch(() => {});
+  }
   await signOut();
 }
