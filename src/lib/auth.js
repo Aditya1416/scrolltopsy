@@ -1,5 +1,5 @@
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import { GoogleAuthProvider, signInWithCredential, signOut as firebaseSignOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signOut as firebaseSignOut, sendEmailVerification } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -67,6 +67,9 @@ export async function acceptPrivacyAndComplete(user) {
     worstDay: '',
     weeklyStats: [],
   }, { merge: true });
+  if (user && !user.emailVerified) {
+    await sendEmailVerification(user).catch(() => {});
+  }
   return user;
 }
 
