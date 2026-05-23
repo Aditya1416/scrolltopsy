@@ -98,8 +98,11 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
               <MonoText size={12} color={C.textSub} style={styles.userName}>
                 {user.displayName?.split(' ')[0]?.toLowerCase() || 'signed in'}
               </MonoText>
-              <MonoText size={10} color={C.textMuted} style={{ marginBottom: 20 }}>
+              <MonoText size={10} color={C.textMuted}>
                 {user.email?.replace(/(.{2}).*(@.*)/, '$1…$2') || ''}
+              </MonoText>
+              <MonoText size={10} color={user?.emailVerified ? '#1D9E75' : C.alarm} style={{ marginTop: 4, marginBottom: 20 }}>
+                {user?.emailVerified ? '✓ verified' : '⚠ not verified — check email'}
               </MonoText>
               <Row label="back up my data" onPress={handleBackup} loading={loading} />
               {backupStatus ? <MonoText size={10} color={C.textSub} style={styles.statusText}>{backupStatus}</MonoText> : null}
