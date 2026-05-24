@@ -33,6 +33,18 @@ yarn-error.*
 # Windows
 Thumbs.db
 
+# scratch screenshots from ADB testing sessions
+screen*.png
+test_home*.png
+android/screen*.png
+
+# graphify knowledge graph output
+graphify-out/
+
+# ruflo vector db
+ruvector.db
+android/ruvector.db
+
 # local env files
 .env
 .env.local
@@ -67,7 +79,9 @@ coverage/
 # logs
 *.log
 
-# keep releases
-!releases/
-releases/*.apk
+# android signing — never commit
+android/key.properties
+android/app/key.properties
+
+# keep releases — APKs are tracked intentionally
 releases/*.idsig
