@@ -81,6 +81,60 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
         } catch (e: Exception) { promise.reject("ERROR", e.message) }
     }
 
+    @ReactMethod fun getAppSessions(packageName: String, days: Double, promise: Promise) {
+        if (!isPermissionGranted()) { promise.reject("PERMISSION_DENIED", "Usage stats permission not granted"); return }
+        try {
+            val usm = reactApplicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val now = System.currentTimeMillis()
+            val startMs = if (days.toInt() == 1) {
+                Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            } else {
+                Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -days.toInt()) }.timeInMillis
+            }
+
+            val events = usm.queryEvents(startMs, now)
+            val event = UsageEvents.Event()
+            val sessions = mutableListOf<WritableMap>()
+            var sessionStart = -1L
+
+            while (events?.hasNextEvent() == true) {
+                events.getNextEvent(event)
+                if (event.packageName != packageName) continue
+                when (event.eventType) {
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> sessionStart = event.timeStamp
+                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                        if (sessionStart > 0) {
+                            val durationMs = event.timeStamp - sessionStart
+                            if (durationMs > 5_000L) {
+                                sessions.add(WritableNativeMap().apply {
+                                    putDouble("startTime", sessionStart.toDouble())
+                                    putDouble("endTime", event.timeStamp.toDouble())
+                                    putDouble("durationMs", durationMs.toDouble())
+                                })
+                            }
+                            sessionStart = -1L
+                        }
+                    }
+                }
+            }
+            if (sessionStart > 0) {
+                val durationMs = now - sessionStart
+                sessions.add(WritableNativeMap().apply {
+                    putDouble("startTime", sessionStart.toDouble())
+                    putDouble("endTime", now.toDouble())
+                    putDouble("durationMs", durationMs.toDouble())
+                })
+            }
+
+            val result = WritableNativeArray()
+            sessions.forEach { result.pushMap(it) }
+            promise.resolve(result)
+        } catch (e: Exception) { promise.reject("ERROR", e.message) }
+    }
+
     @ReactMethod fun getCurrentForegroundApp(promise: Promise) {
         if (!isPermissionGranted()) { promise.resolve(null); return }
         try {

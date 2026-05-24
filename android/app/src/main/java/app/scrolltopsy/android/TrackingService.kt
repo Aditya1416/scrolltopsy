@@ -187,7 +187,7 @@ class TrackingService : Service() {
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setLargeIcon(largeIcon)
             .setContentIntent(pending)
             .setAutoCancel(true)
@@ -211,18 +211,24 @@ class TrackingService : Service() {
             val currentLabel = currentPkg?.let { getAppLabel(pm, it) }
             val currentMs = currentPkg?.let { usage[it] } ?: 0L
 
-            val top5 = usage.entries
+            val userApps = usage.entries
                 .filter { it.key != packageName && isUserApp(pm, it.key) }
                 .sortedByDescending { it.value }
-                .take(5)
+
+            val totalMs = userApps.sumOf { it.value }
+            val totalMins = totalMs / 60_000L
+
+            val top5 = userApps.take(5)
                 .joinToString("  ·  ") { "${getAppLabel(pm, it.key)} ${formatTime(it.value)}" }
 
             val title = if (currentLabel != null)
-                "now: $currentLabel  ·  ${formatTime(currentMs)}"
+                "still on $currentLabel  ·  ${formatTime(currentMs)} gone."
+            else if (totalMins > 0)
+                "${formatTime(totalMs)} lost today."
             else
-                "scrolltopsy  ·  watching"
+                "scrolltopsy  ·  watching."
 
-            val body = top5.ifEmpty { "no screen time recorded yet" }
+            val body = if (top5.isNotEmpty()) "today's damage: $top5" else "no screen time recorded yet"
 
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.notify(NOTIF_ID, buildLiveNotification(title, body))
@@ -263,7 +269,7 @@ class TrackingService : Service() {
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setLargeIcon(largeIcon)
             .setContentIntent(pending)
             .setOngoing(true)

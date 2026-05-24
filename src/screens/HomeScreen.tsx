@@ -1,23 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, AppState, Dimensions, PermissionsAndroid, Platform,
+  Animated, AppState, Dimensions, Modal, PermissionsAndroid, Platform,
   ScrollView, StatusBar, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../theme';
-import { usageStatsModule, trackingServiceModule, AppUsage } from '../lib/nativeModules';
+import { usageStatsModule, trackingServiceModule, AppUsage, AppSession } from '../lib/nativeModules';
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
 import { loadLearnedApps } from '../lib/learnedApps';
 import { quotaModule } from '../lib/quotaModule';
 import { CATEGORY_LABELS } from '../lib/appCategories';
+import { getShameMessage } from '../lib/shame';
 import MonoText from '../components/MonoText';
 import QuotaPickerModal from '../components/QuotaPickerModal';
 import SettingsModal from './SettingsModal';
 
 const CIRCUMFERENCE = 2 * Math.PI * 80;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const PIE_COLORS = ['#E24B4A', '#c8953a', '#4a8fe2', '#6caf3e', '#9b59b6', '#1abc9c'];
 
 interface Props { navigation: any; user: any; }
 
@@ -32,11 +34,66 @@ interface State {
   serviceRunning: boolean;
 }
 
+interface SliceData {
+  packageName: string;
+  appName: string;
+  mins: number;
+  pct: number;
+  color: string;
+  startAngle: number;
+  endAngle: number;
+}
+
 const RISK_COLOR: Record<string, string> = {
   low: '#666666',
   medium: '#c8953a',
   high: C.alarm,
 };
+
+function polar(cx: number, cy: number, r: number, deg: number) {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function slicePath(cx: number, cy: number, r: number, innerR: number, sa: number, ea: number): string {
+  const span = ea - sa;
+  if (span >= 359.99) {
+    const mid = sa + 0.01;
+    const p1 = polar(cx, cy, r, sa);
+    const p2 = polar(cx, cy, r, mid);
+    const p3 = polar(cx, cy, innerR, mid);
+    const p4 = polar(cx, cy, innerR, sa);
+    return `M ${p1.x} ${p1.y} A ${r} ${r} 0 1 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${innerR} ${innerR} 0 1 0 ${p4.x} ${p4.y} Z`;
+  }
+  const largeArc = span > 180 ? 1 : 0;
+  const p1 = polar(cx, cy, r, sa);
+  const p2 = polar(cx, cy, r, ea);
+  const p3 = polar(cx, cy, innerR, ea);
+  const p4 = polar(cx, cy, innerR, sa);
+  return `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${innerR} ${innerR} 0 ${largeArc} 0 ${p4.x} ${p4.y} Z`;
+}
+
+function buildSlices(topApps: Array<{ packageName: string; appName: string; mins: number }>): SliceData[] {
+  const relevant = topApps.slice(0, 6);
+  const total = relevant.reduce((s, a) => s + a.mins, 0);
+  if (total === 0) return [];
+  let angle = 0;
+  return relevant.map((app, i) => {
+    const pct = app.mins / total;
+    const span = pct * 360;
+    const sa = angle;
+    const ea = angle + span;
+    angle = ea;
+    return { packageName: app.packageName, appName: app.appName, mins: app.mins, pct, color: PIE_COLORS[i % PIE_COLORS.length], startAngle: sa, endAngle: ea };
+  });
+}
+
+function formatSessionTime(ts: number): string {
+  const d = new Date(ts);
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
 
 export default function HomeScreen({ navigation, user }: Props) {
   const insets = useSafeAreaInsets();
@@ -53,6 +110,12 @@ export default function HomeScreen({ navigation, user }: Props) {
     risk: 'low',
     serviceRunning: false,
   });
+
+  const [pieFlipped, setPieFlipped] = useState(false);
+  const [selectedSlice, setSelectedSlice] = useState<SliceData | null>(null);
+  const [sliceSessions, setSliceSessions] = useState<AppSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const flipAnim = useRef(new Animated.Value(0)).current;
 
   const arcAnim = useRef(new Animated.Value(CIRCUMFERENCE)).current;
   const greetingOpacity = useRef(new Animated.Value(0)).current;
@@ -106,6 +169,36 @@ export default function HomeScreen({ navigation, user }: Props) {
     return () => { navUnsub(); appStateSub.remove(); };
   }, [navigation, load]);
 
+  const slices = useMemo(() => buildSlices(state.topApps), [state.topApps]);
+
+  const frontOpacity = flipAnim.interpolate({ inputRange: [0.45, 0.55], outputRange: [1, 0] });
+  const backOpacity = flipAnim.interpolate({ inputRange: [0.45, 0.55], outputRange: [0, 1] });
+  const frontRotate = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+  const backRotate = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
+
+  const handleArcPress = () => {
+    if (slices.length === 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const toValue = pieFlipped ? 0 : 1;
+    Animated.spring(flipAnim, { toValue, useNativeDriver: true, friction: 7, tension: 60 }).start();
+    setPieFlipped(v => !v);
+  };
+
+  const handleSlicePress = async (slice: SliceData) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedSlice(slice);
+    setLoadingSessions(true);
+    setSliceSessions([]);
+    try {
+      const sessions = await usageStatsModule.getAppSessions(slice.packageName, 1);
+      setSliceSessions(sessions);
+    } catch {
+      setSliceSessions([]);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
   const handleToggleService = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (state.serviceRunning) {
@@ -145,6 +238,11 @@ export default function HomeScreen({ navigation, user }: Props) {
   const timeLabel = hour < 6 ? 'still up' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 22 ? 'evening' : 'still up';
   const firstName = user?.displayName?.split(' ')[0]?.toLowerCase() ?? '';
 
+  const sliceQuota = selectedSlice ? (quotas[selectedSlice.packageName] ?? 0) : 0;
+  const sliceIsOver = sliceQuota > 0 && (selectedSlice?.mins ?? 0) > sliceQuota;
+  const sliceOverMins = sliceIsOver ? (selectedSlice!.mins - sliceQuota) : 0;
+  const shameMsg = sliceIsOver ? getShameMessage(sliceOverMins, '', sliceSessions.length).message : null;
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
@@ -178,26 +276,77 @@ export default function HomeScreen({ navigation, user }: Props) {
         ) : (
           <>
             <View style={styles.arcCard}>
-              <View style={styles.arcWrapper}>
-                <Svg width={200} height={200} viewBox="0 0 200 200">
-                  <Circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" />
-                  <AnimatedCircle
-                    cx="100" cy="100" r="80"
-                    fill="none"
-                    stroke={C.alarm}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeDasharray={CIRCUMFERENCE}
-                    strokeDashoffset={arcAnim}
-                    rotation="-90"
-                    origin="100, 100"
-                  />
-                </Svg>
-                <View style={styles.arcCenter}>
-                  <MonoText bold size={36} color={C.alarm}>{String(state.totalDoomMins)}</MonoText>
-                  <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>doom mins today</MonoText>
-                </View>
+              {/* 3D flip container */}
+              <View style={styles.flipContainer}>
+                {/* FRONT — arc progress */}
+                <Animated.View style={[
+                  styles.arcFace,
+                  { transform: [{ perspective: 800 }, { rotateY: frontRotate }], opacity: frontOpacity },
+                ]}>
+                  <TouchableOpacity onPress={handleArcPress} activeOpacity={slices.length > 0 ? 0.85 : 1}>
+                    <Svg width={200} height={200} viewBox="0 0 200 200">
+                      <Circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" />
+                      <AnimatedCircle
+                        cx="100" cy="100" r="80"
+                        fill="none"
+                        stroke={C.alarm}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeDasharray={CIRCUMFERENCE}
+                        strokeDashoffset={arcAnim}
+                        rotation="-90"
+                        origin="100, 100"
+                      />
+                    </Svg>
+                    <View style={styles.arcCenter}>
+                      <MonoText bold size={36} color={C.alarm}>{String(state.totalDoomMins)}</MonoText>
+                      <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>doom mins today</MonoText>
+                      {slices.length > 0 && (
+                        <MonoText size={8} color="rgba(255,255,255,0.18)" style={{ marginTop: 6 }}>tap for breakdown</MonoText>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                {/* BACK — pie chart */}
+                <Animated.View style={[
+                  styles.arcFace,
+                  { transform: [{ perspective: 800 }, { rotateY: backRotate }], opacity: backOpacity },
+                ]}>
+                  <Svg width={200} height={200} viewBox="0 0 200 200">
+                    {slices.map(slice => (
+                      <Path
+                        key={slice.packageName}
+                        d={slicePath(100, 100, 78, 34, slice.startAngle, slice.endAngle)}
+                        fill={slice.color}
+                        onPress={() => handleSlicePress(slice)}
+                      />
+                    ))}
+                    {/* donut hole — tap to flip back */}
+                    <Circle cx="100" cy="100" r="34" fill="#000" onPress={handleArcPress} />
+                    <SvgText
+                      x="100" y="106"
+                      textAnchor="middle"
+                      fill="rgba(255,255,255,0.35)"
+                      fontSize="18"
+                      onPress={handleArcPress}
+                    >↩</SvgText>
+                  </Svg>
+                </Animated.View>
               </View>
+
+              {/* Legend (shown when flipped) */}
+              {pieFlipped && slices.length > 0 && (
+                <View style={styles.legend}>
+                  {slices.map(slice => (
+                    <TouchableOpacity key={slice.packageName} onPress={() => handleSlicePress(slice)} style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
+                      <MonoText size={9} color={C.textSub} style={{ flex: 1 }}>{slice.appName}</MonoText>
+                      <MonoText size={9} color={slice.color} style={{ marginLeft: 6 }}>{Math.round(slice.pct * 100)}%</MonoText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               <View style={styles.riskRow}>
                 <MonoText size={9} color={C.textMuted}>risk:</MonoText>
@@ -284,6 +433,68 @@ export default function HomeScreen({ navigation, user }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* Slice detail modal */}
+      <Modal
+        visible={selectedSlice !== null}
+        animationType="slide"
+        transparent
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setSelectedSlice(null)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedSlice(null)} />
+        <View style={[styles.slicePanel, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={styles.panelHandle} />
+
+          {selectedSlice && (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Header */}
+              <View style={styles.sliceHeader}>
+                <View style={[styles.sliceHeaderDot, { backgroundColor: selectedSlice.color }]} />
+                <MonoText bold size={15} color={C.text}>{selectedSlice.appName}</MonoText>
+              </View>
+              <MonoText size={11} color={C.textSub} style={{ marginBottom: 4 }}>
+                {selectedSlice.mins}m today  ·  {Math.round(selectedSlice.pct * 100)}% of doom time
+              </MonoText>
+              {sliceQuota > 0 && (
+                <MonoText size={10} color={sliceIsOver ? C.alarm : '#888888'} style={{ marginBottom: 16 }}>
+                  {sliceIsOver ? `limit: ${sliceQuota}m  ·  +${sliceOverMins}m over` : `limit: ${sliceQuota}m  ·  within quota`}
+                </MonoText>
+              )}
+
+              {/* Shame message */}
+              {shameMsg && (
+                <View style={styles.shameBox}>
+                  <MonoText size={10} color={C.alarm} style={{ lineHeight: 18 }}>{shameMsg}</MonoText>
+                </View>
+              )}
+
+              {/* Sessions */}
+              <MonoText size={9} color={C.textMuted} style={{ marginTop: 16, marginBottom: 8 }}>
+                {loadingSessions ? 'loading sessions…' : `sessions today (${sliceSessions.length})`}
+              </MonoText>
+
+              {!loadingSessions && sliceSessions.length === 0 && (
+                <MonoText size={10} color={C.textMuted}>no sessions recorded.</MonoText>
+              )}
+
+              {sliceSessions.map((session, i) => {
+                const durationMins = Math.max(1, Math.ceil(session.durationMs / 60_000));
+                return (
+                  <View key={i} style={styles.sessionRow}>
+                    <MonoText size={11} color={C.textSub}>
+                      {formatSessionTime(session.startTime)} → {formatSessionTime(session.endTime)}
+                    </MonoText>
+                    <MonoText size={11} color={durationMins >= 30 ? C.alarm : durationMins >= 10 ? '#c8953a' : '#888888'}>
+                      {durationMins}m
+                    </MonoText>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
       <SettingsModal
         visible={showSettings}
         onClose={() => { setShowSettings(false); load(); }}
@@ -310,9 +521,25 @@ const styles = StyleSheet.create({
   permBox: { width: '100%', marginTop: 40, padding: 20, borderWidth: 0.5, borderColor: 'rgba(226,75,74,0.3)', borderRadius: 4 },
   permBtn: { backgroundColor: C.alarm, paddingVertical: 14, alignItems: 'center', borderRadius: 2 },
   arcCard: { width: '100%', alignItems: 'center', marginBottom: 8, paddingVertical: 8 },
-  arcWrapper: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center' },
-  arcCenter: { position: 'absolute', alignItems: 'center' },
-  riskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  flipContainer: { width: 200, height: 200 },
+  arcFace: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backfaceVisibility: 'hidden',
+  },
+  arcCenter: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legend: { width: '100%', marginTop: 12, paddingHorizontal: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  riskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   topAppsSection: { width: '100%', marginTop: 16 },
   appRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.05)' },
   appLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
@@ -328,4 +555,40 @@ const styles = StyleSheet.create({
   ctaDivider: { width: '100%', height: 0.5, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 4 },
   sessionBtn: { paddingVertical: 14, alignItems: 'center' },
   serviceBtn: { paddingVertical: 12, alignItems: 'center' },
+  // Slice detail modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  slicePanel: {
+    backgroundColor: '#0a0a0a',
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    maxHeight: '65%',
+  },
+  panelHandle: {
+    width: 32, height: 3,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sliceHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  sliceHeaderDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  shameBox: {
+    marginTop: 8,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: 'rgba(226,75,74,0.25)',
+    borderRadius: 4,
+    backgroundColor: 'rgba(226,75,74,0.04)',
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
 });
