@@ -10,11 +10,19 @@ export interface AppUsage {
   appCategory?: number;
 }
 
+export interface AppSession {
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+}
+
 export const usageStatsModule = {
   hasPermission: (): Promise<boolean> => UsageStats?.hasPermission() ?? Promise.resolve(false),
   requestPermission: () => UsageStats?.requestPermission(),
   getUsageStats: (days: number): Promise<AppUsage[]> =>
     UsageStats?.getUsageStats(days) ?? Promise.resolve([]),
+  getAppSessions: (packageName: string, days: number): Promise<AppSession[]> =>
+    UsageStats?.getAppSessions(packageName, days) ?? Promise.resolve([]),
   getCurrentForegroundApp: (): Promise<{ packageName: string; appName: string } | null> =>
     UsageStats?.getCurrentForegroundApp() ?? Promise.resolve(null),
 };
