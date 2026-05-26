@@ -11,6 +11,7 @@ import { usageStatsModule, trackingServiceModule, AppUsage, AppSession } from '.
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
 import { loadLearnedApps } from '../lib/learnedApps';
 import { quotaModule } from '../lib/quotaModule';
+import { blockerModule } from '../lib/nativeModules';
 import { CATEGORY_LABELS } from '../lib/appCategories';
 import { getShameMessage } from '../lib/shame';
 import MonoText from '../components/MonoText';
@@ -111,6 +112,7 @@ export default function HomeScreen({ navigation, user }: Props) {
     serviceRunning: false,
   });
 
+  const [blockEnabled, setBlockEnabled] = useState(false);
   const [pieFlipped, setPieFlipped] = useState(false);
   const [selectedSlice, setSelectedSlice] = useState<SliceData | null>(null);
   const [sliceSessions, setSliceSessions] = useState<AppSession[]>([]);
@@ -119,7 +121,7 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   const arcAnim = useRef(new Animated.Value(CIRCUMFERENCE)).current;
   const greetingOpacity = useRef(new Animated.Value(0)).current;
-  const listAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
+  const listAnims = useRef([0, 1, 2, 3, 4, 5, 6, 7].map(() => new Animated.Value(0))).current;
 
   const load = useCallback(async () => {
     try {
@@ -159,7 +161,10 @@ export default function HomeScreen({ navigation, user }: Props) {
     }
   }, []);
 
-  useEffect(() => { loadLearnedApps().then(load); }, []);
+  useEffect(() => {
+    loadLearnedApps().then(load);
+    blockerModule.isBlockEnabled().then(setBlockEnabled);
+  }, []);
 
   useEffect(() => {
     const navUnsub = navigation.addListener('focus', load);
@@ -232,6 +237,13 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   const handleRequestPermission = () => {
     usageStatsModule.requestPermission();
+  };
+
+  const handleToggleBlock = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !blockEnabled;
+    setBlockEnabled(next);
+    blockerModule.setBlockEnabled(next);
   };
 
   const hour = new Date().getHours();
@@ -443,6 +455,16 @@ export default function HomeScreen({ navigation, user }: Props) {
             {state.serviceRunning ? '● tracking active — tap to stop' : '○ start background tracking'}
           </MonoText>
         </TouchableOpacity>
+        {Platform.OS === 'android' && (
+          <TouchableOpacity style={styles.blockToggleRow} onPress={handleToggleBlock}>
+            <MonoText size={10} color={blockEnabled ? '#888888' : '#444444'} style={{ flex: 1 }}>
+              force-block overtime apps
+            </MonoText>
+            <View style={[styles.togglePill, blockEnabled && styles.togglePillOn]}>
+              <View style={[styles.toggleThumb, blockEnabled && styles.toggleThumbOn]} />
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Slice detail modal */}
@@ -567,6 +589,11 @@ const styles = StyleSheet.create({
   ctaDivider: { width: '100%', height: 0.5, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 4 },
   sessionBtn: { paddingVertical: 14, alignItems: 'center' },
   serviceBtn: { paddingVertical: 12, alignItems: 'center' },
+  blockToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, width: '100%', paddingHorizontal: 4 },
+  togglePill: { width: 36, height: 20, borderRadius: 10, backgroundColor: '#1e1e1e', justifyContent: 'center', paddingHorizontal: 2 },
+  togglePillOn: { backgroundColor: '#2a1a1a' },
+  toggleThumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#333333' },
+  toggleThumbOn: { backgroundColor: C.alarm, alignSelf: 'flex-end' },
   // Slice detail modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   slicePanel: {

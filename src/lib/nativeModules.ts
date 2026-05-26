@@ -1,6 +1,6 @@
 import { NativeModules } from 'react-native';
 
-const { UsageStats, TrackingService, OverlayPermission } = NativeModules;
+const { UsageStats, TrackingService, OverlayPermission, AppBlocker } = NativeModules;
 
 export interface AppUsage {
   packageName: string;
@@ -36,4 +36,17 @@ export const trackingServiceModule = {
 export const overlayModule = {
   hasPermission: (): Promise<boolean> => OverlayPermission?.hasPermission() ?? Promise.resolve(false),
   requestPermission: () => OverlayPermission?.requestPermission(),
+};
+
+export const blockerModule = {
+  setBlockEnabled: (enabled: boolean): void => AppBlocker?.setBlockEnabled(enabled),
+  isBlockEnabled: (): Promise<boolean> => AppBlocker?.isBlockEnabled() ?? Promise.resolve(false),
+  blockApp: (packageName: string, screenCount: number): void =>
+    AppBlocker?.blockApp(packageName, screenCount),
+  unblockApp: (packageName: string): void => AppBlocker?.unblockApp(packageName),
+  getBlockedApps: (): Promise<Array<{ packageName: string; screenCount: number; blockedAt: number }>> =>
+    AppBlocker?.getBlockedApps() ?? Promise.resolve([]),
+  hasOverlayPermission: (): Promise<boolean> =>
+    AppBlocker?.hasOverlayPermission() ?? Promise.resolve(false),
+  requestOverlayPermission: (): void => AppBlocker?.requestOverlayPermission(),
 };
