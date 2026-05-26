@@ -5,8 +5,8 @@ export const C = {
   glass: 'rgba(255,255,255,0.04)',
   glassBorder: 'rgba(255,255,255,0.08)',
   text: '#e8e8e8',
-  textSub: '#555555',
-  textMuted: '#252525',
+  textSub: '#aaaaaa',
+  textMuted: '#666666',
   alarm: '#E24B4A',
   alarmDim: 'rgba(226,75,74,0.15)',
 };

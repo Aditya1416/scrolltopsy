@@ -33,6 +33,9 @@ const APP_MAP: Record<string, AppMeta> = {
   'com.chingari.app': { name: 'Chingari', category: 'social' },
   'com.koo.app': { name: 'Koo', category: 'social' },
   'com.google.android.youtube.shorts': { name: 'YouTube Shorts', category: 'social' },
+  'com.google.android.youtube.creator': { name: 'YouTube Studio', category: 'productivity' },
+  'com.google.android.youtube.tvlauncher': { name: 'YouTube TV', category: 'entertainment' },
+  'com.google.android.apps.youtube.kids': { name: 'YouTube Kids', category: 'entertainment' },
   'com.mastodon.app': { name: 'Mastodon', category: 'social' },
   'xyz.blueskyweb.app': { name: 'Bluesky', category: 'social' },
   // ── Messaging ───────────────────────────────────────────────────────────────
@@ -174,6 +177,15 @@ const APP_MAP: Record<string, AppMeta> = {
   'com.snapdeal.main': { name: 'Snapdeal', category: 'shopping' },
   'com.paytmmall.android': { name: 'Paytm Mall', category: 'shopping' },
   'com.shopsy.android': { name: 'Shopsy', category: 'shopping' },
+  'com.fsn.nykaa.man': { name: 'Nykaa Man', category: 'shopping' },
+  'com.fsa.nykaa.android': { name: 'Nykaa', category: 'shopping' },
+  'com.mamaearth.app': { name: 'Mamaearth', category: 'shopping' },
+  'com.bewakoof.app': { name: 'Bewakoof', category: 'shopping' },
+  'com.tatacliq': { name: 'Tata CLiQ', category: 'shopping' },
+  'com.reliance.jiomart': { name: 'JioMart', category: 'shopping' },
+  'com.limeroad.android': { name: 'LimeRoad', category: 'shopping' },
+  'com.firstcry.android': { name: 'FirstCry', category: 'shopping' },
+  'com.purplle.android': { name: 'Purplle', category: 'shopping' },
   // ── Productivity ────────────────────────────────────────────────────────────
   'com.google.android.apps.docs': { name: 'Google Docs', category: 'productivity' },
   'com.google.android.apps.sheets': { name: 'Google Sheets', category: 'productivity' },
@@ -220,13 +232,15 @@ export function mapAndroidCategory(cat: number): AppCategory {
 
 function inferCategoryFromPackage(pkg: string): AppCategory {
   const p = pkg.toLowerCase();
-  if (/game|play|puzzle|chess|word|quiz|trivia/.test(p)) return 'games';
-  if (/news|daily|times|express|herald|report|buzz/.test(p)) return 'news';
-  if (/video|music|stream|media|player|movie|film|tv\./.test(p)) return 'entertainment';
-  if (/shop|store|buy|mart|cart|deal|sale|fashion/.test(p)) return 'shopping';
-  if (/chat|message|talk|meet|call|voice|sms/.test(p)) return 'messaging';
-  if (/browser|web|surf/.test(p)) return 'browser';
-  if (/social|photo|share|snap|post|feed|story/.test(p)) return 'social';
+  if (/youtube|youtu/.test(p)) return 'entertainment';
+  if (/amazon|flipkart|myntra|meesho|nykaa|shopsy|ajio|snapdeal|ebay|wish/.test(p)) return 'shopping';
+  if (/game|play|puzzle|chess|word|quiz|trivia|clash|royale|pubg|roblox|minecraft/.test(p)) return 'games';
+  if (/news|daily|times|express|herald|report|buzz|inshorts/.test(p)) return 'news';
+  if (/netflix|hotstar|prime|video|music|stream|media|player|movie|film|spotify|jio\.cinema/.test(p)) return 'entertainment';
+  if (/shop|store|buy|mart|cart|deal|sale|fashion|zomato|swiggy|blinkit|zepto/.test(p)) return 'shopping';
+  if (/chat|message|talk|meet|call|voice|sms|whatsapp|telegram/.test(p)) return 'messaging';
+  if (/browser|web|surf|chrome|firefox|brave|opera/.test(p)) return 'browser';
+  if (/social|photo|share|snap|post|feed|story|instagram|tiktok|twitter/.test(p)) return 'social';
   return 'other';
 }
 
@@ -264,4 +278,4 @@ export const CATEGORY_LABELS: Record<AppCategory, string> = {
   other: 'other',
 };
 
-export const DOOMSCROLL_CATEGORIES: AppCategory[] = ['social', 'entertainment', 'news', 'games'];
+export const DOOMSCROLL_CATEGORIES: AppCategory[] = ['social', 'entertainment', 'news', 'games', 'shopping', 'browser'];

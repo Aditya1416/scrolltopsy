@@ -51,7 +51,7 @@ export function analyzeUsage(stats: AppUsage[]): UsageAnalysis {
   const topApps = mapped
     .filter(a => a.mins >= 1)
     .sort((a, b) => b.mins - a.mins)
-    .slice(0, 5)
+    .slice(0, 8)
     .map(({ packageName, appName, mins, category }) => ({ packageName, appName, mins, category }));
 
   // Persist newly encountered apps for self-learning

@@ -265,13 +265,25 @@ export default function HomeScreen({ navigation, user }: Props) {
 
         {state.hasPermission === false ? (
           <View style={styles.permBox}>
-            <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>usage permission needed</MonoText>
-            <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 16 }}>
-              scrolltopsy needs access to usage stats{'\n'}to automatically track your doomscrolling.{'\n'}no manual input required.
-            </MonoText>
-            <TouchableOpacity style={styles.permBtn} onPress={handleRequestPermission}>
-              <MonoText bold size={12} color="#000">grant access →</MonoText>
-            </TouchableOpacity>
+            {Platform.OS === 'ios' ? (
+              <>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>ios detected</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20 }}>
+                  background tracking and auto usage stats{'\n'}are android-only features.{'\n\n'}
+                  you can still track sessions manually{'\n'}using the button below.
+                </MonoText>
+              </>
+            ) : (
+              <>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>usage permission needed</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 16 }}>
+                  scrolltopsy needs access to usage stats{'\n'}to automatically track your doomscrolling.{'\n'}no manual input required.
+                </MonoText>
+                <TouchableOpacity style={styles.permBtn} onPress={handleRequestPermission}>
+                  <MonoText bold size={12} color="#000">grant access →</MonoText>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         ) : (
           <>

@@ -10,6 +10,15 @@ export default defineConfig({
     target: 'es2020',
     chunkSizeWarningLimit: 200,
     rollupOptions: {
+      external: [
+        '@codetrix-studio/capacitor-google-auth',
+        '@capacitor/core',
+        '@capacitor/app',
+        '@capacitor/haptics',
+        '@capacitor/keyboard',
+        '@capacitor/status-bar',
+        '@capacitor-firebase/authentication',
+      ],
       output: {
         manualChunks: (id) => {
           if (id.includes('firebase/app')) return 'firebase-core';
