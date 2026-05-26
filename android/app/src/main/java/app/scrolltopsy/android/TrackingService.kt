@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import java.util.Calendar
+import kotlin.math.max
 
 class TrackingService : Service() {
     companion object {
@@ -29,9 +30,19 @@ class TrackingService : Service() {
             handler.postDelayed(this, 10_000L)
         }
     }
+    private val blockCheckRunnable = object : Runnable {
+        override fun run() {
+            checkBlockedApps()
+            handler.postDelayed(this, 1_500L)
+        }
+    }
 
     // Tracks the highest shame level already fired per app today
     private val alreadyShamed = mutableMapOf<String, Int>()
+    // Tracks apps we've already blocked this session (don't re-block on every poll)
+    private val alreadyBlocked = mutableMapOf<String, Boolean>()
+    // Debounce: pkg → last intercept timestamp
+    private val lastInterceptTime = mutableMapOf<String, Long>()
 
     override fun onCreate() {
         super.onCreate()
@@ -48,12 +59,14 @@ class TrackingService : Service() {
             startForeground(NOTIF_ID, notification)
         }
         handler.post(pollRunnable)
+        handler.postDelayed(blockCheckRunnable, 2_000L)
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(pollRunnable)
+        handler.removeCallbacks(blockCheckRunnable)
         super.onDestroy()
     }
 
@@ -120,16 +133,26 @@ class TrackingService : Service() {
 
     private fun checkQuotas(usage: Map<String, Long>) {
         val prefs = getSharedPreferences(QuotaModule.PREFS_NAME, Context.MODE_PRIVATE)
+        val blockerPrefs = getSharedPreferences(BlockerModule.PREFS_NAME, Context.MODE_PRIVATE)
+        val blockEnabled = blockerPrefs.getBoolean(BlockerModule.KEY_BLOCK_ENABLED, false)
         val pm = packageManager
 
         usage.forEach { (pkg, ms) ->
             val limitMins = prefs.getInt("${QuotaModule.KEY_PREFIX}$pkg", 0)
-            if (limitMins <= 0) { alreadyShamed.remove(pkg); return@forEach }
+            if (limitMins <= 0) {
+                alreadyShamed.remove(pkg)
+                alreadyBlocked.remove(pkg)
+                return@forEach
+            }
 
             val usageMins = ms / 60_000L
             val overMins = usageMins - limitMins
 
-            if (overMins < 0) { alreadyShamed.remove(pkg); return@forEach }
+            if (overMins < 0) {
+                alreadyShamed.remove(pkg)
+                alreadyBlocked.remove(pkg)
+                return@forEach
+            }
 
             val level = when {
                 overMins >= 120 -> 5
@@ -143,7 +166,57 @@ class TrackingService : Service() {
                 alreadyShamed[pkg] = level
                 fireShameNotification(pkg, getAppLabel(pm, pkg), overMins.toInt(), level)
             }
+
+            // Block the app once per quota exceedance event (if feature is enabled)
+            if (blockEnabled && !(alreadyBlocked[pkg] == true)) {
+                alreadyBlocked[pkg] = true
+                // n = floor(quota hours), screenCount = n+1, minimum 1
+                val screenCount = max(1, limitMins / 60 + 1)
+                blockerPrefs.edit()
+                    .putLong("${BlockerModule.KEY_PREFIX}$pkg", System.currentTimeMillis())
+                    .putInt("${BlockerModule.KEY_SCREENS}$pkg", screenCount)
+                    .apply()
+                // Best-effort kill background processes
+                try {
+                    (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
+                        .killBackgroundProcesses(pkg)
+                } catch (_: Exception) {}
+            }
         }
+    }
+
+    // ── Blocked app interception ──────────────────────────────────────────────
+
+    private fun checkBlockedApps() {
+        // Don't intercept while shame screens are already showing
+        if (ShameInterceptActivity.isShowing) return
+
+        val blockerPrefs = getSharedPreferences(BlockerModule.PREFS_NAME, Context.MODE_PRIVATE)
+        val blockedPkgs = blockerPrefs.all.keys
+            .filter { it.startsWith(BlockerModule.KEY_PREFIX) }
+            .map { it.removePrefix(BlockerModule.KEY_PREFIX) }
+        if (blockedPkgs.isEmpty()) return
+
+        val foreground = getCurrentForegroundPkg() ?: return
+        if (foreground !in blockedPkgs) return
+
+        // Debounce: give 4s buffer after last intercept to prevent double-launch
+        val now = System.currentTimeMillis()
+        val last = lastInterceptTime[foreground] ?: 0L
+        if (now - last < 4_000L) return
+
+        lastInterceptTime[foreground] = now
+
+        val screenCount = blockerPrefs.getInt("${BlockerModule.KEY_SCREENS}$foreground", 1)
+        val appDisplayName = getAppLabel(packageManager, foreground)
+
+        val intent = Intent(this, ShameInterceptActivity::class.java).apply {
+            putExtra(ShameInterceptActivity.EXTRA_PKG, foreground)
+            putExtra(ShameInterceptActivity.EXTRA_APP_NAME, appDisplayName)
+            putExtra(ShameInterceptActivity.EXTRA_SCREEN_COUNT, screenCount)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        startActivity(intent)
     }
 
     private fun fireShameNotification(pkg: String, appName: String, overMins: Int, level: Int) {
