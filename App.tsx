@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './src/lib/firebase';
 import { configureGoogleSignIn } from './src/lib/auth';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import TrackingScreen from './src/screens/TrackingScreen';
@@ -17,7 +18,8 @@ configureGoogleSignIn();
 
 const Stack = createStackNavigator();
 
-export default function App() {
+function AppContent() {
+  const { C } = useTheme();
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
@@ -30,27 +32,39 @@ export default function App() {
     return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
-  if (user === undefined) return <View style={styles.splash} />;
+  if (user === undefined) return <View style={[styles.splash, { backgroundColor: C.void }]} />;
 
   if (!user) {
-    return (
-      <SafeAreaProvider>
-        <LoginScreen onLoginSuccess={() => {}} />
-      </SafeAreaProvider>
-    );
+    return <LoginScreen onLoginSuccess={() => {}} />;
   }
 
   return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: C.void },
+          gestureEnabled: false,
+        }}
+      >
+        <Stack.Screen name="Home">{props => <HomeScreen {...props} user={user} />}</Stack.Screen>
+        <Stack.Screen name="Tracking" component={TrackingScreen} />
+        <Stack.Screen name="Shame" component={ShameScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: '#000' }, gestureEnabled: false }}>
-          <Stack.Screen name="Home">{props => <HomeScreen {...props} user={user} />}</Stack.Screen>
-          <Stack.Screen name="Tracking" component={TrackingScreen} />
-          <Stack.Screen name="Shame" component={ShameScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({ splash: { flex: 1, backgroundColor: '#000000' } });
+const styles = StyleSheet.create({
+  splash: { flex: 1 },
+});

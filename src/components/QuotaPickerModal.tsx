@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import MonoText from './MonoText';
 
 interface Props {
@@ -23,6 +23,7 @@ const PRESETS = [
 
 export default function QuotaPickerModal({ visible, appName, currentLimit, onSet, onRemove, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const { C } = useTheme();
   const [hours, setHours] = useState(0);
   const [mins, setMins] = useState(0);
 
@@ -79,9 +80,9 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 40 }]}>
+      <View style={[styles.sheet, { backgroundColor: C.surface, borderTopColor: C.glassBorder, paddingBottom: insets.bottom + 40 }]}>
 
-        <View style={styles.handle} />
+        <View style={[styles.handle, { backgroundColor: C.textMuted }]} />
 
         <MonoText size={9} color={C.textSub} style={styles.title}>
           {`daily limit  ·  ${appName}`}
@@ -92,15 +93,15 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
           {/* Hours */}
           <View style={styles.unit}>
             <TouchableOpacity onPress={() => adjHours(1)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
-              <MonoText size={22} color='#555555'>+</MonoText>
+              <MonoText size={22} color={C.text}>+</MonoText>
             </TouchableOpacity>
-            <MonoText bold size={64} color={hours > 0 ? C.text : '#2a2a2a'} style={styles.digit}>
+            <MonoText bold size={64} color={hours > 0 ? C.text : C.separator} style={styles.digit}>
               {String(hours).padStart(2, '0')}
             </MonoText>
             <TouchableOpacity onPress={() => adjHours(-1)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
-              <MonoText size={22} color='#555555'>−</MonoText>
+              <MonoText size={22} color={C.text}>−</MonoText>
             </TouchableOpacity>
-            <MonoText size={8} color='#333333' style={styles.unitLabel}>hours</MonoText>
+            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>hours</MonoText>
           </View>
 
           <MonoText bold size={56} color={C.alarm} style={styles.colon}>:</MonoText>
@@ -108,15 +109,15 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
           {/* Minutes */}
           <View style={styles.unit}>
             <TouchableOpacity onPress={() => adjMins(5)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
-              <MonoText size={22} color='#555555'>+</MonoText>
+              <MonoText size={22} color={C.text}>+</MonoText>
             </TouchableOpacity>
-            <MonoText bold size={64} color={mins > 0 || hours > 0 ? C.text : '#2a2a2a'} style={styles.digit}>
+            <MonoText bold size={64} color={mins > 0 || hours > 0 ? C.text : C.separator} style={styles.digit}>
               {String(mins).padStart(2, '0')}
             </MonoText>
             <TouchableOpacity onPress={() => adjMins(-5)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
-              <MonoText size={22} color='#555555'>−</MonoText>
+              <MonoText size={22} color={C.text}>−</MonoText>
             </TouchableOpacity>
-            <MonoText size={8} color='#333333' style={styles.unitLabel}>mins</MonoText>
+            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>mins</MonoText>
           </View>
         </View>
 
@@ -125,23 +126,23 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
           {PRESETS.map(p => (
             <TouchableOpacity
               key={p.mins}
-              style={[styles.preset, totalMins === p.mins && styles.presetActive]}
+              style={[styles.preset, { borderColor: totalMins === p.mins ? C.alarm : C.glassBorder }]}
               onPress={() => handlePreset(p.mins)}
             >
-              <MonoText size={11} color={totalMins === p.mins ? C.alarm : '#555555'}>{p.label}</MonoText>
+              <MonoText size={11} color={totalMins === p.mins ? C.alarm : C.text}>{p.label}</MonoText>
             </TouchableOpacity>
           ))}
         </View>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: C.separator }]} />
 
         {/* Set button */}
         <TouchableOpacity
-          style={[styles.setBtn, totalMins === 0 && styles.setBtnDisabled]}
+          style={[styles.setBtn, totalMins === 0 && { backgroundColor: C.inputBg }]}
           onPress={handleSet}
           disabled={totalMins === 0}
         >
-          <MonoText bold size={13} color={totalMins > 0 ? '#000000' : '#2a2a2a'}>
+          <MonoText bold size={13} color={totalMins > 0 ? '#000000' : C.textMuted}>
             {`set limit: ${limitLabel}`}
           </MonoText>
         </TouchableOpacity>
@@ -154,7 +155,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
         )}
 
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-          <MonoText size={11} color='#444444'>cancel</MonoText>
+          <MonoText size={11} color={C.textSub}>cancel</MonoText>
         </TouchableOpacity>
 
       </View>
@@ -165,14 +166,12 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)' },
   sheet: {
-    backgroundColor: '#080808',
     paddingHorizontal: 32,
     paddingBottom: 40,
     paddingTop: 12,
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.07)',
   },
-  handle: { width: 36, height: 3, backgroundColor: '#222', borderRadius: 2, alignSelf: 'center', marginBottom: 24 },
+  handle: { width: 36, height: 3, borderRadius: 2, alignSelf: 'center', marginBottom: 24 },
   title: { textAlign: 'center', marginBottom: 28, letterSpacing: 1 },
   clockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
   unit: { alignItems: 'center', width: 110 },
@@ -182,15 +181,13 @@ const styles = StyleSheet.create({
   presets: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 28 },
   preset: {
     paddingHorizontal: 18, paddingVertical: 9,
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 2,
+    borderWidth: 0.5, borderRadius: 2,
   },
-  presetActive: { borderColor: C.alarm },
-  divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.05)', marginBottom: 20 },
+  divider: { height: 0.5, marginBottom: 20 },
   setBtn: {
-    backgroundColor: C.alarm, paddingVertical: 16,
+    backgroundColor: '#E24B4A', paddingVertical: 16,
     alignItems: 'center', borderRadius: 2, marginBottom: 12,
   },
-  setBtnDisabled: { backgroundColor: '#111111' },
   removeBtn: { paddingVertical: 14, alignItems: 'center', marginBottom: 2 },
   cancelBtn: { paddingVertical: 12, alignItems: 'center' },
 });

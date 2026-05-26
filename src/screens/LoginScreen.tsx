@@ -3,12 +3,13 @@ import { View, StyleSheet, Animated, TouchableOpacity, Alert, StatusBar, ScrollV
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MonoText from '../components/MonoText';
 import { signInWithGoogle, acceptPrivacy } from '../lib/auth';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface Props { onLoginSuccess: () => void; }
 
 export default function LoginScreen({ onLoginSuccess }: Props) {
   const insets = useSafeAreaInsets();
+  const { C, isDark } = useTheme();
   const [loading, setLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -40,8 +41,8 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <View style={[styles.root, { backgroundColor: C.void, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={C.void} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -50,7 +51,7 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
         <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <MonoText size={10} color={C.alarm} style={styles.label}>scrolltopsy</MonoText>
           <MonoText bold size={28} color={C.text} style={styles.title}>an autopsy of{'\n'}your screen time.</MonoText>
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.alarm }]} />
           <MonoText size={11} color={C.textSub} style={styles.body}>
             this app reads your usage stats.{'\n'}
             it will show you exactly which apps{'\n'}
@@ -58,7 +59,7 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
             no judgement. just numbers.{'\n'}
             brutal, accurate numbers.
           </MonoText>
-          <View style={styles.permissionsBox}>
+          <View style={[styles.permissionsBox, { backgroundColor: C.alarmDim, borderColor: 'rgba(226,75,74,0.2)' }]}>
             <MonoText size={10} color={C.textMuted}>requires access to:</MonoText>
             {['usage statistics', 'display over apps', 'notifications'].map(p => (
               <MonoText key={p} size={10} color={C.textSub} style={{ marginTop: 4 }}>— {p}</MonoText>
@@ -86,16 +87,16 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 28, paddingBottom: 16 },
   content: { flex: 1, justifyContent: 'center', paddingTop: 40 },
   label: { marginBottom: 12, letterSpacing: 4 },
   title: { lineHeight: 38, marginBottom: 24 },
-  divider: { width: 32, height: 1, backgroundColor: C.alarm, marginBottom: 24 },
+  divider: { width: 32, height: 1, marginBottom: 24 },
   body: { lineHeight: 22, marginBottom: 24 },
-  permissionsBox: { backgroundColor: 'rgba(226,75,74,0.06)', borderWidth: 0.5, borderColor: 'rgba(226,75,74,0.2)', borderRadius: 8, padding: 16 },
+  permissionsBox: { borderWidth: 0.5, borderRadius: 8, padding: 16 },
   ctaArea: { paddingBottom: 32 },
-  signInBtn: { backgroundColor: C.alarm, paddingVertical: 16, alignItems: 'center', borderRadius: 2 },
+  signInBtn: { backgroundColor: '#E24B4A', paddingVertical: 16, alignItems: 'center', borderRadius: 2 },
   signInBtnDisabled: { opacity: 0.5 },
   privacyNote: { textAlign: 'center', marginTop: 12, lineHeight: 18 },
 });
