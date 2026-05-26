@@ -178,6 +178,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/week/:token" element={<WeekView />} />
+        <Route path="/privacy" element={<Privacy standalone />} />
         <Route path="*" element={<MainApp />} />
       </Routes>
     </BrowserRouter>
