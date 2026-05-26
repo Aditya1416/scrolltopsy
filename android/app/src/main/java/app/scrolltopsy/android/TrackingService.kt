@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import java.util.Calendar
 import kotlin.math.max
@@ -39,10 +40,10 @@ class TrackingService : Service() {
 
     // Tracks the highest shame level already fired per app today
     private val alreadyShamed = mutableMapOf<String, Int>()
-    // Tracks apps we've already blocked this session (don't re-block on every poll)
-    private val alreadyBlocked = mutableMapOf<String, Boolean>()
-    // Debounce: pkg → last intercept timestamp
-    private val lastInterceptTime = mutableMapOf<String, Long>()
+    // Tracks blocked apps currently in foreground (to only intercept on entry, not continuously)
+    private val blockedAppsInFg = mutableSetOf<String>()
+    // Last known foreground pkg (for detecting fg exits)
+    private var lastFgPkg: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -112,20 +113,46 @@ class TrackingService : Service() {
         return try {
             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
-            val events = usm.queryEvents(now - 5 * 60_000L, now) ?: return null
+            // 30-minute window handles Samsung's delayed event delivery
+            val events = usm.queryEvents(now - 30 * 60_000L, now) ?: return null
             var currentFg: String? = null
+            // True when our own app holds the most recent MOVE_TO_FOREGROUND; suppresses fallback.
+            var ownAppInFg = false
+            // Samsung One UI sometimes skips MOVE_TO_FOREGROUND for user apps; track the last
+            // ACTIVITY_RESUMED as a fallback. Never override a primary MOVE_TO_FOREGROUND result —
+            // Samsung also fires ACTIVITY_RESUMED for system components (keyboard, SoundAlive) which
+            // would otherwise shadow the real foreground user app.
+            var lastResumedFallback: String? = null
             val event = UsageEvents.Event()
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
-                if (pkg == packageName) continue
                 when (event.eventType) {
-                    UsageEvents.Event.MOVE_TO_FOREGROUND -> currentFg = pkg
-                    UsageEvents.Event.MOVE_TO_BACKGROUND ->
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                        if (pkg == packageName) {
+                            ownAppInFg = true
+                            currentFg = null
+                        } else {
+                            ownAppInFg = false
+                            currentFg = pkg
+                        }
+                    }
+                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                        if (pkg == packageName) ownAppInFg = false
                         if (currentFg == pkg) currentFg = null
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    event.eventType == UsageEvents.Event.ACTIVITY_RESUMED &&
+                    pkg != packageName) {
+                    lastResumedFallback = pkg
                 }
             }
-            currentFg
+            // Suppress fallback when our own app is currently in the foreground (scrolltopsy or
+            // ShameInterceptActivity) — the stale lastResumedFallback would be a different app.
+            val result = if (ownAppInFg) null else (currentFg ?: lastResumedFallback)
+            android.util.Log.d("STFgPkg", "currentFg=$currentFg ownAppInFg=$ownAppInFg fallback=$lastResumedFallback → $result")
+            result
         } catch (e: Exception) { null }
     }
 
@@ -134,14 +161,21 @@ class TrackingService : Service() {
     private fun checkQuotas(usage: Map<String, Long>) {
         val prefs = getSharedPreferences(QuotaModule.PREFS_NAME, Context.MODE_PRIVATE)
         val blockerPrefs = getSharedPreferences(BlockerModule.PREFS_NAME, Context.MODE_PRIVATE)
-        val blockEnabled = blockerPrefs.getBoolean(BlockerModule.KEY_BLOCK_ENABLED, false)
         val pm = packageManager
 
         usage.forEach { (pkg, ms) ->
             val limitMins = prefs.getInt("${QuotaModule.KEY_PREFIX}$pkg", 0)
             if (limitMins <= 0) {
                 alreadyShamed.remove(pkg)
-                alreadyBlocked.remove(pkg)
+                // Clear any stale block entry when quota is removed
+                if (blockerPrefs.contains("${BlockerModule.KEY_PREFIX}$pkg")) {
+                    blockerPrefs.edit()
+                        .remove("${BlockerModule.KEY_PREFIX}$pkg")
+                        .remove("${BlockerModule.KEY_SCREENS}$pkg")
+                        .remove("${BlockerModule.KEY_GAUNTLET_TS}$pkg")
+                        .apply()
+                    blockedAppsInFg.remove(pkg)
+                }
                 return@forEach
             }
 
@@ -150,7 +184,15 @@ class TrackingService : Service() {
 
             if (overMins < 0) {
                 alreadyShamed.remove(pkg)
-                alreadyBlocked.remove(pkg)
+                // Clear block since usage dropped back under quota
+                if (blockerPrefs.contains("${BlockerModule.KEY_PREFIX}$pkg")) {
+                    blockerPrefs.edit()
+                        .remove("${BlockerModule.KEY_PREFIX}$pkg")
+                        .remove("${BlockerModule.KEY_SCREENS}$pkg")
+                        .remove("${BlockerModule.KEY_GAUNTLET_TS}$pkg")
+                        .apply()
+                    blockedAppsInFg.remove(pkg)
+                }
                 return@forEach
             }
 
@@ -167,20 +209,24 @@ class TrackingService : Service() {
                 fireShameNotification(pkg, getAppLabel(pm, pkg), overMins.toInt(), level)
             }
 
-            // Block the app once per quota exceedance event (if feature is enabled)
-            if (blockEnabled && !(alreadyBlocked[pkg] == true)) {
-                alreadyBlocked[pkg] = true
-                // n = floor(quota hours), screenCount = n+1, minimum 1
+            // Write/update block entry every cycle when force-stop is enabled and over quota.
+            // Removing the !contains guard ensures the entry is written even if the service
+            // restarted after force_stop was set, or if a previous write was missed.
+            val forceStop = blockerPrefs.getBoolean("${BlockerModule.KEY_FORCE_STOP}$pkg", false)
+            if (forceStop) {
                 val screenCount = max(1, limitMins / 60 + 1)
+                val existingTs = blockerPrefs.getLong("${BlockerModule.KEY_PREFIX}$pkg", 0L)
                 blockerPrefs.edit()
-                    .putLong("${BlockerModule.KEY_PREFIX}$pkg", System.currentTimeMillis())
+                    .putLong("${BlockerModule.KEY_PREFIX}$pkg",
+                        if (existingTs > 0L) existingTs else System.currentTimeMillis())
                     .putInt("${BlockerModule.KEY_SCREENS}$pkg", screenCount)
                     .apply()
-                // Best-effort kill background processes
-                try {
-                    (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
-                        .killBackgroundProcesses(pkg)
-                } catch (_: Exception) {}
+                if (existingTs == 0L) {
+                    try {
+                        (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
+                            .killBackgroundProcesses(pkg)
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -188,30 +234,50 @@ class TrackingService : Service() {
     // ── Blocked app interception ──────────────────────────────────────────────
 
     private fun checkBlockedApps() {
-        // Don't intercept while shame screens are already showing
-        if (ShameInterceptActivity.isShowing) return
-
         val blockerPrefs = getSharedPreferences(BlockerModule.PREFS_NAME, Context.MODE_PRIVATE)
         val blockedPkgs = blockerPrefs.all.keys
             .filter { it.startsWith(BlockerModule.KEY_PREFIX) }
             .map { it.removePrefix(BlockerModule.KEY_PREFIX) }
+
+        val currentFg = getCurrentForegroundPkg()
+
+        // Track foreground exits: when pkg leaves fg, clear tracking so next entry triggers intercept
+        val prev = lastFgPkg
+        if (prev != null && prev != currentFg) {
+            android.util.Log.d("STBlock", "fg exit: $prev → removing from blockedInFg")
+            blockedAppsInFg.remove(prev)
+        }
+        lastFgPkg = currentFg
+
         if (blockedPkgs.isEmpty()) return
+        android.util.Log.d("STBlock", "fg=$currentFg blockedPkgs=$blockedPkgs blockedInFg=$blockedAppsInFg isShowing=${ShameInterceptActivity.isShowing}")
+        if (ShameInterceptActivity.isShowing) { android.util.Log.d("STBlock", "SKIP: isShowing"); return }
+        if (currentFg == null || currentFg !in blockedPkgs) { android.util.Log.d("STBlock", "SKIP: fg null or not blocked"); return }
+        if (currentFg in blockedAppsInFg) { android.util.Log.d("STBlock", "SKIP: already in blockedInFg"); return }
 
-        val foreground = getCurrentForegroundPkg() ?: return
-        if (foreground !in blockedPkgs) return
+        // Grace period: don't re-intercept within 30s of completing the gauntlet
+        val gauntletTs = blockerPrefs.getLong("${BlockerModule.KEY_GAUNTLET_TS}$currentFg", 0L)
+        if (System.currentTimeMillis() - gauntletTs < 30_000L) {
+            android.util.Log.d("STBlock", "SKIP: gauntlet grace period active")
+            blockedAppsInFg.add(currentFg)
+            return
+        }
 
-        // Debounce: give 4s buffer after last intercept to prevent double-launch
-        val now = System.currentTimeMillis()
-        val last = lastInterceptTime[foreground] ?: 0L
-        if (now - last < 4_000L) return
+        // Overlay permission is required to start an activity from a background service
+        // on Android 10+. Without it, startActivity() silently fails.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            android.util.Log.d("STBlock", "SKIP: no overlay permission")
+            blockedAppsInFg.add(currentFg) // don't spam-retry on every 1.5s tick
+            return
+        }
 
-        lastInterceptTime[foreground] = now
+        blockedAppsInFg.add(currentFg)
+        val screenCount = blockerPrefs.getInt("${BlockerModule.KEY_SCREENS}$currentFg", 1)
+        val appDisplayName = getAppLabel(packageManager, currentFg)
 
-        val screenCount = blockerPrefs.getInt("${BlockerModule.KEY_SCREENS}$foreground", 1)
-        val appDisplayName = getAppLabel(packageManager, foreground)
-
+        android.util.Log.d("STBlock", "LAUNCHING ShameInterceptActivity for $currentFg screens=$screenCount")
         val intent = Intent(this, ShameInterceptActivity::class.java).apply {
-            putExtra(ShameInterceptActivity.EXTRA_PKG, foreground)
+            putExtra(ShameInterceptActivity.EXTRA_PKG, currentFg)
             putExtra(ShameInterceptActivity.EXTRA_APP_NAME, appDisplayName)
             putExtra(ShameInterceptActivity.EXTRA_SCREEN_COUNT, screenCount)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP

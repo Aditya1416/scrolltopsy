@@ -4,10 +4,12 @@ import {
   Linking, ScrollView, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { signInWithGoogle, signOut, deleteAccount, acceptPrivacy } from '../lib/auth';
 import { syncToFirestore } from '../lib/sync';
 import { deleteAllData } from '../lib/storage';
+import { LANGUAGES, setLanguage } from '../i18n';
 import MonoText from '../components/MonoText';
 
 interface Props {
@@ -19,9 +21,11 @@ interface Props {
 export default function SettingsModal({ visible, onClose, user }: Props) {
   const insets = useSafeAreaInsets();
   const { C, isDark, toggleTheme } = useTheme();
+  const { t, i18n } = useTranslation();
   const [backupStatus, setBackupStatus] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLangPicker, setShowLangPicker] = useState(false);
 
   const handleSignIn = async () => {
     try {
@@ -32,7 +36,7 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
       }
       onClose();
     } catch (e: any) {
-      Alert.alert('sign in failed', e.message || 'unknown error');
+      Alert.alert(t('login_sign_in_failed'), e.message || 'unknown error');
     } finally {
       setLoading(false);
     }
@@ -43,10 +47,10 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
     try {
       setLoading(true);
       await syncToFirestore(user.uid);
-      setBackupStatus('backed up.');
+      setBackupStatus(t('settings_backed_up'));
       setTimeout(() => setBackupStatus(''), 3000);
     } catch (e: any) {
-      setBackupStatus(e.message || 'backup failed');
+      setBackupStatus(e.message || t('settings_backup_failed'));
       setTimeout(() => setBackupStatus(''), 5000);
     } finally {
       setLoading(false);
@@ -60,12 +64,12 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
 
   const handleDelete = () => {
     Alert.alert(
-      'delete all data',
-      'this cannot be undone.',
+      t('settings_delete_confirm'),
+      t('settings_delete_body'),
       [
-        { text: 'cancel', style: 'cancel' },
+        { text: t('settings_delete_cancel'), style: 'cancel' },
         {
-          text: 'delete everything',
+          text: t('settings_delete_btn'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -97,24 +101,24 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
           {user ? (
             <>
               <MonoText size={12} color={C.textSub} style={styles.userName}>
-                {user.displayName?.split(' ')[0]?.toLowerCase() || 'signed in'}
+                {user.displayName?.split(' ')[0]?.toLowerCase() || t('settings_signed_in')}
               </MonoText>
               <MonoText size={10} color={C.textMuted}>
                 {user.email?.replace(/(.{2}).*(@.*)/, '$1…$2') || ''}
               </MonoText>
               <MonoText size={10} color={user?.emailVerified ? '#1D9E75' : C.alarm} style={{ marginTop: 4, marginBottom: 20 }}>
-                {user?.emailVerified ? '✓ verified' : '⚠ not verified — check email'}
+                {user?.emailVerified ? t('settings_verified') : t('settings_not_verified')}
               </MonoText>
-              <Row label="back up my data" onPress={handleBackup} loading={loading} C={C} />
+              <Row label={t('settings_backup')} onPress={handleBackup} loading={loading} C={C} />
               {backupStatus ? <MonoText size={10} color={C.textSub} style={styles.statusText}>{backupStatus}</MonoText> : null}
-              <Row label="share this week" onPress={handleShare} C={C} />
+              <Row label={t('settings_share')} onPress={handleShare} C={C} />
               {shareUrl ? <MonoText size={9} color={C.textSub} style={styles.statusText}>{shareUrl}</MonoText> : null}
-              <Row label="sign out" onPress={handleSignOut} C={C} />
-              <Row label="delete all my data" onPress={handleDelete} danger C={C} />
+              <Row label={t('settings_sign_out')} onPress={handleSignOut} C={C} />
+              <Row label={t('settings_delete')} onPress={handleDelete} danger C={C} />
             </>
           ) : (
             <>
-              <Row label={loading ? 'signing in…' : 'sign in with google →'} onPress={handleSignIn} loading={loading} C={C} />
+              <Row label={loading ? t('login_signing_in') : t('login_sign_in')} onPress={handleSignIn} loading={loading} C={C} />
             </>
           )}
           <View style={[styles.divider, { backgroundColor: C.separator }]} />
@@ -122,14 +126,34 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
           {/* Light / dark toggle */}
           <TouchableOpacity style={[styles.themeRow, { borderBottomColor: C.separator }]} onPress={toggleTheme}>
             <MonoText size={13} color={C.textSub} style={{ flex: 1 }}>
-              {isDark ? 'light mode' : 'dark mode'}
+              {isDark ? t('settings_light_mode') : t('settings_dark_mode')}
             </MonoText>
             <MonoText size={11} color={C.textMuted}>{isDark ? '○' : '●'}</MonoText>
           </TouchableOpacity>
 
+          {/* Language selector */}
+          <TouchableOpacity style={[styles.themeRow, { borderBottomColor: C.separator }]} onPress={() => setShowLangPicker(v => !v)}>
+            <MonoText size={13} color={C.textSub} style={{ flex: 1 }}>{t('settings_language')}</MonoText>
+            <MonoText size={11} color={C.textMuted}>{LANGUAGES.find(l => l.code === i18n.language)?.label ?? 'English'}</MonoText>
+          </TouchableOpacity>
+          {showLangPicker && (
+            <View style={styles.langList}>
+              {LANGUAGES.map(lang => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={styles.langRow}
+                  onPress={() => { setLanguage(lang.code); setShowLangPicker(false); }}
+                >
+                  <MonoText size={11} color={i18n.language === lang.code ? C.alarm : C.textSub}>{lang.label}</MonoText>
+                  {i18n.language === lang.code && <MonoText size={10} color={C.alarm}>●</MonoText>}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <View style={[styles.divider, { backgroundColor: C.separator }]} />
           <TouchableOpacity onPress={() => Linking.openURL('https://scrolltopsy.vercel.app/privacy')}>
-            <MonoText size={10} color={C.textMuted} style={[styles.row, { borderBottomColor: C.separator }]}>privacy policy</MonoText>
+            <MonoText size={10} color={C.textMuted} style={[styles.row, { borderBottomColor: C.separator }]}>{t('settings_privacy')}</MonoText>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -169,4 +193,6 @@ const styles = StyleSheet.create({
   userName: { marginBottom: 4 },
   statusText: { paddingVertical: 6, paddingLeft: 4 },
   divider: { height: 0.5, marginVertical: 12 },
+  langList: { paddingLeft: 12, paddingBottom: 8 },
+  langRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
 });

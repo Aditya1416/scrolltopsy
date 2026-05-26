@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, TouchableOpacity, Alert, StatusBar, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import MonoText from '../components/MonoText';
 import { signInWithGoogle, acceptPrivacy } from '../lib/auth';
 import { useTheme } from '../context/ThemeContext';
@@ -10,6 +11,7 @@ interface Props { onLoginSuccess: () => void; }
 export default function LoginScreen({ onLoginSuccess }: Props) {
   const insets = useSafeAreaInsets();
   const { C, isDark } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -34,7 +36,7 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
       const result = await signInWithGoogle();
       if (result?.requiresConsent) await acceptPrivacy(result.user);
     } catch (e: any) {
-      Alert.alert('sign in failed', e.message || 'unknown error');
+      Alert.alert(t('login_sign_in_failed'), e.message || 'unknown error');
     } finally {
       setLoading(false);
     }
@@ -49,19 +51,13 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <MonoText size={10} color={C.alarm} style={styles.label}>scrolltopsy</MonoText>
-          <MonoText bold size={28} color={C.text} style={styles.title}>an autopsy of{'\n'}your screen time.</MonoText>
+          <MonoText size={10} color={C.alarm} style={styles.label}>{t('login_brand')}</MonoText>
+          <MonoText bold size={28} color={C.text} style={styles.title}>{t('login_title')}</MonoText>
           <View style={[styles.divider, { backgroundColor: C.alarm }]} />
-          <MonoText size={11} color={C.textSub} style={styles.body}>
-            this app reads your usage stats.{'\n'}
-            it will show you exactly which apps{'\n'}
-            are eating your life, and by how much.{'\n\n'}
-            no judgement. just numbers.{'\n'}
-            brutal, accurate numbers.
-          </MonoText>
+          <MonoText size={11} color={C.textSub} style={styles.body}>{t('login_body')}</MonoText>
           <View style={[styles.permissionsBox, { backgroundColor: C.alarmDim, borderColor: 'rgba(226,75,74,0.2)' }]}>
-            <MonoText size={10} color={C.textMuted}>requires access to:</MonoText>
-            {['usage statistics', 'display over apps', 'notifications'].map(p => (
+            <MonoText size={10} color={C.textMuted}>{t('login_requires')}</MonoText>
+            {([t('login_perm_usage'), t('login_perm_overlay'), t('login_perm_notifications')] as string[]).map((p: string) => (
               <MonoText key={p} size={10} color={C.textSub} style={{ marginTop: 4 }}>— {p}</MonoText>
             ))}
           </View>
@@ -74,12 +70,10 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
             activeOpacity={0.7}
           >
             <MonoText bold size={13} color="#000">
-              {loading ? 'signing in…' : 'sign in with google →'}
+              {loading ? t('login_signing_in') : t('login_sign_in')}
             </MonoText>
           </TouchableOpacity>
-          <MonoText size={9} color={C.textMuted} style={styles.privacyNote}>
-            weekly aggregates sync to firestore.{'\n'}raw sessions stay on your device.
-          </MonoText>
+          <MonoText size={9} color={C.textMuted} style={styles.privacyNote}>{t('login_privacy_note')}</MonoText>
         </Animated.View>
       </ScrollView>
     </View>

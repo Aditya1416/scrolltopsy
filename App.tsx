@@ -8,6 +8,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './src/lib/firebase';
 import { configureGoogleSignIn } from './src/lib/auth';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { initI18n } from './src/i18n';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import TrackingScreen from './src/screens/TrackingScreen';
@@ -15,6 +16,7 @@ import ShameScreen from './src/screens/ShameScreen';
 
 SplashScreen.preventAutoHideAsync();
 configureGoogleSignIn();
+initI18n();
 
 const Stack = createStackNavigator();
 
