@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { getData } from '../lib/storage';
 import { getShameMessage, getEquivalences } from '../lib/shame';
 import { useTheme } from '../context/ThemeContext';
@@ -19,6 +20,7 @@ export default function ShameScreen({ navigation, route }: Props) {
   const { durationMins } = route.params;
   const insets = useSafeAreaInsets();
   const { C, isDark } = useTheme();
+  const { t } = useTranslation();
   const eq = getEquivalences(durationMins);
 
   const [message, setMessage] = useState('');
@@ -85,10 +87,10 @@ export default function ShameScreen({ navigation, route }: Props) {
   }, [message]);
 
   const ledger = [
-    { label: 'pages you could have read', value: String(eq.pages) },
-    { label: 'steps you could have walked', value: eq.steps.toLocaleString() },
-    { label: 'lines of code', value: String(eq.lines) },
-    { label: 'fraction of a power nap', value: `${eq.nap}%` },
+    { label: t('shame_pages'), value: String(eq.pages) },
+    { label: t('shame_steps'), value: eq.steps.toLocaleString() },
+    { label: t('shame_lines'), value: String(eq.lines) },
+    { label: t('shame_nap'), value: `${eq.nap}%` },
   ];
 
   return (
@@ -100,7 +102,7 @@ export default function ShameScreen({ navigation, route }: Props) {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={C.void} />
 
       <Animated.View style={{ opacity: fadeHeader, marginBottom: 32 }}>
-        <MonoText size={9} color={C.textMuted}>autopsy complete</MonoText>
+        <MonoText size={9} color={C.textMuted}>{t('shame_autopsy')}</MonoText>
       </Animated.View>
 
       <Animated.View style={{ transform: [{ scale: scaleNumber }], opacity: fadeNumber, alignItems: 'center' }}>
@@ -117,7 +119,7 @@ export default function ShameScreen({ navigation, route }: Props) {
       </Animated.View>
 
       <Animated.View style={{ opacity: fadeLabel, marginBottom: 24 }}>
-        <MonoText size={11} color={C.textMuted}>minutes unrecoverable</MonoText>
+        <MonoText size={11} color={C.textMuted}>{t('shame_unrecoverable')}</MonoText>
       </Animated.View>
 
       <Animated.View style={[styles.divider, { opacity: fadeDivider, backgroundColor: C.separator }]} />
@@ -143,7 +145,11 @@ export default function ShameScreen({ navigation, route }: Props) {
       {data && (
         <Animated.View style={{ opacity: fadeStats, marginBottom: 20 }}>
           <MonoText size={10} color={C.textMuted}>
-            {`today: ${data.sessions?.filter((s: any) => new Date(s.startedAt).toDateString() === new Date().toDateString()).reduce((a: number, s: any) => a + s.durationMins, 0)}m  ·  session ${data.totalSessions}  ·  total: ${data.totalMins}m`}
+            {t('shame_today', {
+              mins: data.sessions?.filter((s: any) => new Date(s.startedAt).toDateString() === new Date().toDateString()).reduce((a: number, s: any) => a + s.durationMins, 0),
+              n: data.totalSessions,
+              total: data.totalMins,
+            })}
           </MonoText>
         </Animated.View>
       )}
@@ -151,7 +157,7 @@ export default function ShameScreen({ navigation, route }: Props) {
       {data?.scrolltype ? (
         <Animated.View style={{ opacity: fadeScrolltype, transform: [{ scale: scaleScrolltype }], width: '100%', marginBottom: 32 }}>
           <GlassCard style={{ borderColor: 'rgba(226,75,74,0.3)' }}>
-            <MonoText size={9} color={C.textMuted} style={{ marginBottom: 4 }}>classification</MonoText>
+            <MonoText size={9} color={C.textMuted} style={{ marginBottom: 4 }}>{t('shame_classification')}</MonoText>
             <MonoText size={13} color={C.textSub}>{data.scrolltype}</MonoText>
           </GlassCard>
         </Animated.View>
@@ -159,11 +165,11 @@ export default function ShameScreen({ navigation, route }: Props) {
 
       <View style={styles.footnotes}>
         <TouchableOpacity onPress={() => navigation.replace('Tracking')}>
-          <MonoText size={9} color={C.textSub}>go again</MonoText>
+          <MonoText size={9} color={C.textSub}>{t('shame_go_again')}</MonoText>
         </TouchableOpacity>
         <MonoText size={9} color={C.textMuted}>  ·  </MonoText>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <MonoText size={9} color={C.textSub}>done for now</MonoText>
+          <MonoText size={9} color={C.textSub}>{t('shame_done')}</MonoText>
         </TouchableOpacity>
       </View>
     </ScrollView>

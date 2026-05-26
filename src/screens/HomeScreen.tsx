@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, AppState, Dimensions, Modal, PermissionsAndroid, Platform,
+  Alert, Animated, AppState, Dimensions, Modal, PermissionsAndroid, Platform,
   ScrollView, StatusBar, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { usageStatsModule, trackingServiceModule, AppUsage, AppSession } from '../lib/nativeModules';
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
@@ -93,12 +94,13 @@ function formatSessionTime(ts: number): string {
 export default function HomeScreen({ navigation, user }: Props) {
   const insets = useSafeAreaInsets();
   const { C, isDark } = useTheme();
+  const { t } = useTranslation();
 
   const RISK_COLOR = { low: C.textMuted, medium: '#c8953a', high: C.alarm };
 
   const [showSettings, setShowSettings] = useState(false);
   const [quotas, setQuotas] = useState<Record<string, number>>({});
-  const [quotaPicker, setQuotaPicker] = useState<{ packageName: string; appName: string } | null>(null);
+  const [quotaPicker, setQuotaPicker] = useState<{ packageName: string; appName: string; currentForceStop: boolean } | null>(null);
   const [state, setState] = useState<State>({
     hasPermission: null,
     stats: [],
@@ -110,7 +112,7 @@ export default function HomeScreen({ navigation, user }: Props) {
     serviceRunning: false,
   });
 
-  const [blockEnabled, setBlockEnabled] = useState(false);
+  const [forceStops, setForceStops] = useState<Record<string, boolean>>({});
   const [pieFlipped, setPieFlipped] = useState(false);
   const [selectedSlice, setSelectedSlice] = useState<SliceData | null>(null);
   const [sliceSessions, setSliceSessions] = useState<AppSession[]>([]);
@@ -161,7 +163,6 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   useEffect(() => {
     loadLearnedApps().then(load);
-    blockerModule.isBlockEnabled().then(setBlockEnabled);
   }, []);
 
   useEffect(() => {
@@ -216,32 +217,45 @@ export default function HomeScreen({ navigation, user }: Props) {
     setState(s => ({ ...s, serviceRunning: running }));
   };
 
-  const handleSetQuota = (packageName: string, appName: string) => {
+  const handleSetQuota = async (packageName: string, appName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setQuotaPicker({ packageName, appName });
+    const currentForceStop = await blockerModule.isForceStopEnabled(packageName);
+    setQuotaPicker({ packageName, appName, currentForceStop });
   };
 
-  const handleQuotaSet = async (limitMins: number) => {
+  const handleQuotaSet = async (limitMins: number, forceStop: boolean) => {
     if (!quotaPicker) return;
     await quotaModule.setQuota(quotaPicker.packageName, limitMins);
+    blockerModule.setForceStop(quotaPicker.packageName, forceStop);
     setQuotas(q => ({ ...q, [quotaPicker.packageName]: limitMins }));
+    setForceStops(f => ({ ...f, [quotaPicker.packageName]: forceStop }));
+
+    if (forceStop && Platform.OS === 'android') {
+      const hasOverlay = await blockerModule.hasOverlayPermission();
+      if (!hasOverlay) {
+        Alert.alert(
+          t('overlay_title'),
+          t('overlay_body'),
+          [
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('overlay_go_settings'), onPress: () => blockerModule.requestOverlayPermission() },
+          ]
+        );
+      }
+    }
   };
 
   const handleQuotaRemove = async () => {
     if (!quotaPicker) return;
     await quotaModule.clearQuota(quotaPicker.packageName);
+    blockerModule.setForceStop(quotaPicker.packageName, false);
+    blockerModule.unblockApp(quotaPicker.packageName);
     setQuotas(q => { const n = { ...q }; delete n[quotaPicker.packageName]; return n; });
+    setForceStops(f => { const n = { ...f }; delete n[quotaPicker.packageName]; return n; });
   };
 
   const handleRequestPermission = () => {
     usageStatsModule.requestPermission();
-  };
-
-  const handleToggleBlock = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = !blockEnabled;
-    setBlockEnabled(next);
-    blockerModule.setBlockEnabled(next);
   };
 
   const hour = new Date().getHours();
@@ -277,20 +291,15 @@ export default function HomeScreen({ navigation, user }: Props) {
           <View style={[styles.permBox, { borderColor: 'rgba(226,75,74,0.3)' }]}>
             {Platform.OS === 'ios' ? (
               <>
-                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>ios detected</MonoText>
-                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20 }}>
-                  background tracking and auto usage stats{'\n'}are android-only features.{'\n\n'}
-                  you can still track sessions manually{'\n'}using the button below.
-                </MonoText>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>{t('home_ios_title')}</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20 }}>{t('home_ios_body')}</MonoText>
               </>
             ) : (
               <>
-                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>usage permission needed</MonoText>
-                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 16 }}>
-                  scrolltopsy needs access to usage stats{'\n'}to automatically track your doomscrolling.{'\n'}no manual input required.
-                </MonoText>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>{t('home_permission_needed')}</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 16 }}>{t('home_permission_body')}</MonoText>
                 <TouchableOpacity style={styles.permBtn} onPress={handleRequestPermission}>
-                  <MonoText bold size={12} color="#000">grant access →</MonoText>
+                  <MonoText bold size={12} color="#000">{t('home_grant_access')}</MonoText>
                 </TouchableOpacity>
               </>
             )}
@@ -321,9 +330,9 @@ export default function HomeScreen({ navigation, user }: Props) {
                     </Svg>
                     <View style={styles.arcCenter}>
                       <MonoText bold size={36} color={C.alarm}>{String(state.totalDoomMins)}</MonoText>
-                      <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>doom mins today</MonoText>
+                      <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>{t('home_doom_mins')}</MonoText>
                       {slices.length > 0 && (
-                        <MonoText size={8} color={C.separator} style={{ marginTop: 6 }}>tap for breakdown</MonoText>
+                        <MonoText size={8} color={C.separator} style={{ marginTop: 6 }}>{t('home_tap_breakdown')}</MonoText>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -369,7 +378,7 @@ export default function HomeScreen({ navigation, user }: Props) {
               )}
 
               <View style={styles.riskRow}>
-                <MonoText size={9} color={C.textMuted}>risk:</MonoText>
+                <MonoText size={9} color={C.textMuted}>{t('home_risk')}</MonoText>
                 <MonoText size={9} color={RISK_COLOR[state.risk]} style={{ marginLeft: 6 }}>{state.risk}</MonoText>
                 {state.scrolltype ? (
                   <MonoText size={9} color={C.textMuted} style={{ marginLeft: 12 }}>· {state.scrolltype}</MonoText>
@@ -380,7 +389,7 @@ export default function HomeScreen({ navigation, user }: Props) {
             {state.topApps.length > 0 && (
               <View style={styles.topAppsSection}>
                 <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>
-                  top offenders today  <MonoText size={8} color={C.textMuted}>· tap to set limit</MonoText>
+                  {t('home_top_offenders')}  <MonoText size={8} color={C.textMuted}>{t('home_tap_limit')}</MonoText>
                 </MonoText>
                 {state.topApps.map((app, i) => {
                   const quota = quotas[app.packageName] || 0;
@@ -424,7 +433,7 @@ export default function HomeScreen({ navigation, user }: Props) {
 
             {Object.keys(state.byCategory).length > 0 && (
               <View style={styles.catBreakdown}>
-                <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>by category</MonoText>
+                <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>{t('home_by_category')}</MonoText>
                 {Object.entries(state.byCategory)
                   .sort((a, b) => b[1] - a[1])
                   .map(([cat, mins]) => (
@@ -445,23 +454,13 @@ export default function HomeScreen({ navigation, user }: Props) {
       <View style={[styles.bottomArea, { paddingBottom: insets.bottom + 16 }]}>
         <View style={[styles.ctaDivider, { backgroundColor: C.separator }]} />
         <TouchableOpacity style={styles.sessionBtn} onPress={() => navigation.navigate('Tracking')}>
-          <MonoText size={12} color={C.alarm}>→ track a session</MonoText>
+          <MonoText size={12} color={C.alarm}>{t('home_track_session')}</MonoText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.serviceBtn} onPress={handleToggleService} disabled={state.hasPermission === false}>
           <MonoText size={12} color={state.serviceRunning ? C.alarm : C.text}>
-            {state.serviceRunning ? '● tracking active — tap to stop' : '○ start background tracking'}
+            {state.serviceRunning ? t('home_tracking_active') : t('home_start_tracking')}
           </MonoText>
         </TouchableOpacity>
-        {Platform.OS === 'android' && (
-          <TouchableOpacity style={styles.blockToggleRow} onPress={handleToggleBlock}>
-            <MonoText size={10} color={blockEnabled ? C.textSub : C.textMuted} style={{ flex: 1 }}>
-              force-block overtime apps
-            </MonoText>
-            <View style={[styles.togglePill, { backgroundColor: blockEnabled ? C.alarmDim : C.surface2 }]}>
-              <View style={[styles.toggleThumb, { backgroundColor: blockEnabled ? C.alarm : C.textMuted, alignSelf: blockEnabled ? 'flex-end' : 'flex-start' }]} />
-            </View>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Slice detail modal */}
@@ -487,7 +486,7 @@ export default function HomeScreen({ navigation, user }: Props) {
               </MonoText>
               {sliceQuota > 0 && (
                 <MonoText size={10} color={sliceIsOver ? C.alarm : C.textMuted} style={{ marginBottom: 16 }}>
-                  {sliceIsOver ? `limit: ${sliceQuota}m  ·  +${sliceOverMins}m over` : `limit: ${sliceQuota}m  ·  within quota`}
+                  {sliceIsOver ? t('home_limit_over', { limit: sliceQuota, over: sliceOverMins }) : t('home_limit_within', { limit: sliceQuota })}
                 </MonoText>
               )}
 
@@ -498,11 +497,11 @@ export default function HomeScreen({ navigation, user }: Props) {
               )}
 
               <MonoText size={9} color={C.textMuted} style={{ marginTop: 16, marginBottom: 8 }}>
-                {loadingSessions ? 'loading sessions…' : `sessions today (${sliceSessions.length})`}
+                {loadingSessions ? t('loading') : `${t('home_sessions_today')} (${sliceSessions.length})`}
               </MonoText>
 
               {!loadingSessions && sliceSessions.length === 0 && (
-                <MonoText size={10} color={C.textMuted}>no sessions recorded.</MonoText>
+                <MonoText size={10} color={C.textMuted}>{t('home_no_sessions')}</MonoText>
               )}
 
               {sliceSessions.map((session, i) => {
@@ -533,6 +532,7 @@ export default function HomeScreen({ navigation, user }: Props) {
         visible={quotaPicker !== null}
         appName={quotaPicker?.appName ?? ''}
         currentLimit={quotaPicker ? (quotas[quotaPicker.packageName] || 0) : 0}
+        currentForceStop={quotaPicker?.currentForceStop ?? false}
         onSet={handleQuotaSet}
         onRemove={handleQuotaRemove}
         onClose={() => setQuotaPicker(null)}
@@ -581,9 +581,6 @@ const styles = StyleSheet.create({
   ctaDivider: { width: '100%', height: 0.5, marginBottom: 4 },
   sessionBtn: { paddingVertical: 14, alignItems: 'center' },
   serviceBtn: { paddingVertical: 12, alignItems: 'center' },
-  blockToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, width: '100%', paddingHorizontal: 4 },
-  togglePill: { width: 36, height: 20, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 2 },
-  toggleThumb: { width: 16, height: 16, borderRadius: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   slicePanel: {
     borderTopWidth: 0.5,

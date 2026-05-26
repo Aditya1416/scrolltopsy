@@ -6,6 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { saveSession } from '../lib/storage';
 import { syncToFirestore } from '../lib/sync';
 import { auth } from '../lib/firebase';
@@ -19,6 +20,7 @@ interface Props { navigation: any; }
 export default function TrackingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { C, isDark } = useTheme();
+  const { t } = useTranslation();
   const startTimeRef = useRef<string>('');
   const [elapsed, setElapsed] = useState(0);
   const pulse = useRef(new Animated.Value(0)).current;
@@ -98,13 +100,13 @@ export default function TrackingScreen({ navigation }: Props) {
           {timerStr}
         </MonoText>
         <MonoText size={10} color={C.textMuted} style={{ marginTop: 8 }}>
-          still scrolling
+          {t('tracking_still_scrolling')}
         </MonoText>
       </View>
 
       <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
         <MonoText size={13} color={C.text} style={{ paddingVertical: 20 }}>
-          i'm done
+          {t('tracking_done')}
         </MonoText>
       </TouchableOpacity>
     </View>

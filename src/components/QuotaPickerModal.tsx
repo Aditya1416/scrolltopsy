@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import MonoText from './MonoText';
 
@@ -9,7 +10,8 @@ interface Props {
   visible: boolean;
   appName: string;
   currentLimit: number; // minutes, 0 = none
-  onSet: (limitMins: number) => void;
+  currentForceStop: boolean;
+  onSet: (limitMins: number, forceStop: boolean) => void;
   onRemove: () => void;
   onClose: () => void;
 }
@@ -21,18 +23,21 @@ const PRESETS = [
   { label: '2h',  mins: 120 },
 ];
 
-export default function QuotaPickerModal({ visible, appName, currentLimit, onSet, onRemove, onClose }: Props) {
+export default function QuotaPickerModal({ visible, appName, currentLimit, currentForceStop, onSet, onRemove, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { C } = useTheme();
+  const { t } = useTranslation();
   const [hours, setHours] = useState(0);
   const [mins, setMins] = useState(0);
+  const [forceStop, setForceStop] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setHours(Math.floor((currentLimit || 0) / 60));
       setMins((currentLimit || 0) % 60);
+      setForceStop(currentForceStop);
     }
-  }, [visible, currentLimit]);
+  }, [visible, currentLimit, currentForceStop]);
 
   const totalMins = hours * 60 + mins;
 
@@ -63,7 +68,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
   const handleSet = () => {
     if (totalMins === 0) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onSet(totalMins);
+    onSet(totalMins, forceStop);
     onClose();
   };
 
@@ -85,7 +90,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
         <View style={[styles.handle, { backgroundColor: C.textMuted }]} />
 
         <MonoText size={9} color={C.textSub} style={styles.title}>
-          {`daily limit  ·  ${appName}`}
+          {t('quota_daily_limit', { app: appName })}
         </MonoText>
 
         {/* Clock display */}
@@ -101,7 +106,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
             <TouchableOpacity onPress={() => adjHours(-1)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
               <MonoText size={22} color={C.text}>−</MonoText>
             </TouchableOpacity>
-            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>hours</MonoText>
+            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>{t('quota_hours')}</MonoText>
           </View>
 
           <MonoText bold size={56} color={C.alarm} style={styles.colon}>:</MonoText>
@@ -117,7 +122,7 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
             <TouchableOpacity onPress={() => adjMins(-5)} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
               <MonoText size={22} color={C.text}>−</MonoText>
             </TouchableOpacity>
-            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>mins</MonoText>
+            <MonoText size={8} color={C.textMuted} style={styles.unitLabel}>{t('quota_mins')}</MonoText>
           </View>
         </View>
 
@@ -136,6 +141,23 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
 
         <View style={[styles.divider, { backgroundColor: C.separator }]} />
 
+        {/* Force-stop toggle */}
+        <TouchableOpacity
+          style={styles.forceStopRow}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setForceStop(v => !v); }}
+          activeOpacity={0.7}
+        >
+          <View style={{ flex: 1 }}>
+            <MonoText size={11} color={forceStop ? C.text : C.textMuted}>{t('quota_force_stop_label')}</MonoText>
+            <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>{t('quota_force_stop_desc')}</MonoText>
+          </View>
+          <View style={[styles.togglePill, { backgroundColor: forceStop ? C.alarmDim : C.surface2 }]}>
+            <View style={[styles.toggleThumb, { backgroundColor: forceStop ? C.alarm : C.textMuted, alignSelf: forceStop ? 'flex-end' : 'flex-start' }]} />
+          </View>
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: C.separator }]} />
+
         {/* Set button */}
         <TouchableOpacity
           style={[styles.setBtn, totalMins === 0 && { backgroundColor: C.inputBg }]}
@@ -143,19 +165,19 @@ export default function QuotaPickerModal({ visible, appName, currentLimit, onSet
           disabled={totalMins === 0}
         >
           <MonoText bold size={13} color={totalMins > 0 ? '#000000' : C.textMuted}>
-            {`set limit: ${limitLabel}`}
+            {t('quota_set', { limit: limitLabel })}
           </MonoText>
         </TouchableOpacity>
 
         {/* Remove (only if limit already set) */}
         {currentLimit > 0 && (
           <TouchableOpacity style={styles.removeBtn} onPress={handleRemove}>
-            <MonoText size={11} color={C.alarm}>remove limit</MonoText>
+            <MonoText size={11} color={C.alarm}>{t('quota_remove')}</MonoText>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-          <MonoText size={11} color={C.textSub}>cancel</MonoText>
+          <MonoText size={11} color={C.textSub}>{t('cancel')}</MonoText>
         </TouchableOpacity>
 
       </View>
@@ -183,7 +205,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 9,
     borderWidth: 0.5, borderRadius: 2,
   },
-  divider: { height: 0.5, marginBottom: 20 },
+  divider: { height: 0.5, marginBottom: 16 },
+  forceStopRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginBottom: 16 },
+  togglePill: { width: 36, height: 20, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleThumb: { width: 16, height: 16, borderRadius: 8 },
   setBtn: {
     backgroundColor: '#E24B4A', paddingVertical: 16,
     alignItems: 'center', borderRadius: 2, marginBottom: 12,

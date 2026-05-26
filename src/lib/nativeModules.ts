@@ -39,8 +39,10 @@ export const overlayModule = {
 };
 
 export const blockerModule = {
-  setBlockEnabled: (enabled: boolean): void => AppBlocker?.setBlockEnabled(enabled),
-  isBlockEnabled: (): Promise<boolean> => AppBlocker?.isBlockEnabled() ?? Promise.resolve(false),
+  setForceStop: (packageName: string, enabled: boolean): void =>
+    AppBlocker?.setForceStop(packageName, enabled),
+  isForceStopEnabled: (packageName: string): Promise<boolean> =>
+    AppBlocker?.isForceStopEnabled(packageName) ?? Promise.resolve(false),
   blockApp: (packageName: string, screenCount: number): void =>
     AppBlocker?.blockApp(packageName, screenCount),
   unblockApp: (packageName: string): void => AppBlocker?.unblockApp(packageName),
