@@ -52,6 +52,7 @@ export default {
   shame_classification: 'classification',
   shame_go_again: 'go again',
   shame_done: 'done for now',
+  shame_share: 'share →',
   shame_today: 'today: {{mins}}m  ·  session {{n}}  ·  total: {{total}}m',
 
   // SettingsModal
@@ -86,6 +87,12 @@ export default {
   overlay_title: 'display over other apps',
   overlay_body: "force-stop needs the 'display over other apps' permission to intercept an app when your limit is exceeded. grant it in settings.",
   overlay_go_settings: 'go to settings',
+
+  // Accessibility permission prompt (force-stop real-time blocking)
+  accessibility_title: 'accessibility permission',
+  accessibility_body: "instant blocking needs the accessibility permission to detect app opens in real time. without it, the block can take up to 15 seconds to appear.",
+  accessibility_go_settings: 'enable in settings',
+  accessibility_restricted_hint: "if the toggle is grayed out: app info → ⋮ → allow restricted settings, then try again.",
 
   // Categories
   cat_social: 'social',

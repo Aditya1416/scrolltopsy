@@ -46,9 +46,14 @@ export const blockerModule = {
   blockApp: (packageName: string, screenCount: number): void =>
     AppBlocker?.blockApp(packageName, screenCount),
   unblockApp: (packageName: string): void => AppBlocker?.unblockApp(packageName),
+  clearGauntlet: (packageName: string): void => AppBlocker?.clearGauntlet(packageName),
+  setTheme: (isDark: boolean): void => AppBlocker?.setThemeDark(isDark),
   getBlockedApps: (): Promise<Array<{ packageName: string; screenCount: number; blockedAt: number }>> =>
     AppBlocker?.getBlockedApps() ?? Promise.resolve([]),
   hasOverlayPermission: (): Promise<boolean> =>
     AppBlocker?.hasOverlayPermission() ?? Promise.resolve(false),
   requestOverlayPermission: (): void => AppBlocker?.requestOverlayPermission(),
+  hasAccessibilityPermission: (): Promise<boolean> =>
+    AppBlocker?.hasAccessibilityPermission() ?? Promise.resolve(false),
+  requestAccessibilityPermission: (): void => AppBlocker?.requestAccessibilityPermission(),
 };

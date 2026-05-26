@@ -113,6 +113,7 @@ export default function HomeScreen({ navigation, user }: Props) {
   });
 
   const [forceStops, setForceStops] = useState<Record<string, boolean>>({});
+  const [permBanners, setPermBanners] = useState({ overlay: false, accessibility: false });
   const [pieFlipped, setPieFlipped] = useState(false);
   const [selectedSlice, setSelectedSlice] = useState<SliceData | null>(null);
   const [sliceSessions, setSliceSessions] = useState<AppSession[]>([]);
@@ -145,6 +146,25 @@ export default function HomeScreen({ navigation, user }: Props) {
 
       setState({ hasPermission: true, stats, totalDoomMins, byCategory, topApps, scrolltype, risk, serviceRunning: running });
       setQuotas(q);
+
+      if (Platform.OS === 'android') {
+        // Request notification permission proactively on Android 13+
+        if ((Platform.Version as number) >= 33) {
+          const hasNotif = await PermissionsAndroid.check('android.permission.POST_NOTIFICATIONS' as any);
+          if (!hasNotif) PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);
+        }
+        // Show overlay/accessibility banners only when force-stop blocks exist
+        const blocked = await blockerModule.getBlockedApps();
+        if (blocked.length > 0) {
+          const [hasOverlay, hasAccess] = await Promise.all([
+            blockerModule.hasOverlayPermission(),
+            blockerModule.hasAccessibilityPermission(),
+          ]);
+          setPermBanners({ overlay: !hasOverlay, accessibility: !hasAccess });
+        } else {
+          setPermBanners({ overlay: false, accessibility: false });
+        }
+      }
 
       const progress = Math.min(totalDoomMins / 120, 1);
       Animated.timing(arcAnim, {
@@ -205,11 +225,13 @@ export default function HomeScreen({ navigation, user }: Props) {
 
   const handleToggleService = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const next = !state.serviceRunning;
+    setState(s => ({ ...s, serviceRunning: next })); // immediate UI feedback
     if (state.serviceRunning) {
       await trackingServiceModule.stop();
     } else {
-      if (Platform.OS === 'android' && Platform.Version >= 33) {
-        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS');
+      if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
+        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);
       }
       await trackingServiceModule.start();
     }
@@ -227,6 +249,14 @@ export default function HomeScreen({ navigation, user }: Props) {
     if (!quotaPicker) return;
     await quotaModule.setQuota(quotaPicker.packageName, limitMins);
     blockerModule.setForceStop(quotaPicker.packageName, forceStop);
+    if (forceStop) {
+      // Register the block entry so AccessibilityService intercepts on next open
+      blockerModule.blockApp(quotaPicker.packageName, 1);
+      // Clear any existing grace period so the block fires immediately
+      blockerModule.clearGauntlet(quotaPicker.packageName);
+    } else {
+      blockerModule.unblockApp(quotaPicker.packageName);
+    }
     setQuotas(q => ({ ...q, [quotaPicker.packageName]: limitMins }));
     setForceStops(f => ({ ...f, [quotaPicker.packageName]: forceStop }));
 
@@ -239,6 +269,18 @@ export default function HomeScreen({ navigation, user }: Props) {
           [
             { text: t('cancel'), style: 'cancel' },
             { text: t('overlay_go_settings'), onPress: () => blockerModule.requestOverlayPermission() },
+          ]
+        );
+        return;
+      }
+      const hasAccessibility = await blockerModule.hasAccessibilityPermission();
+      if (!hasAccessibility) {
+        Alert.alert(
+          t('accessibility_title'),
+          t('accessibility_body'),
+          [
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('accessibility_go_settings'), onPress: () => blockerModule.requestAccessibilityPermission() },
           ]
         );
       }
@@ -306,6 +348,25 @@ export default function HomeScreen({ navigation, user }: Props) {
           </View>
         ) : (
           <>
+            {permBanners.overlay && Platform.OS === 'android' && (
+              <View style={[styles.permBox, { borderColor: 'rgba(226,75,74,0.3)', marginBottom: 16 }]}>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>{t('overlay_title')}</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 12 }}>{t('overlay_body')}</MonoText>
+                <TouchableOpacity style={styles.permBtn} onPress={() => blockerModule.requestOverlayPermission()}>
+                  <MonoText bold size={12} color="#000">{t('overlay_go_settings')}</MonoText>
+                </TouchableOpacity>
+              </View>
+            )}
+            {permBanners.accessibility && Platform.OS === 'android' && (
+              <View style={[styles.permBox, { borderColor: 'rgba(226,75,74,0.3)', marginBottom: 16 }]}>
+                <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>{t('accessibility_title')}</MonoText>
+                <MonoText size={11} color={C.textSub} style={{ lineHeight: 20, marginBottom: 6 }}>{t('accessibility_body')}</MonoText>
+                <MonoText size={10} color={C.textMuted} style={{ lineHeight: 18, marginBottom: 12 }}>{t('accessibility_restricted_hint')}</MonoText>
+                <TouchableOpacity style={styles.permBtn} onPress={() => blockerModule.requestAccessibilityPermission()}>
+                  <MonoText bold size={12} color="#000">{t('accessibility_go_settings')}</MonoText>
+                </TouchableOpacity>
+              </View>
+            )}
             <View style={styles.arcCard}>
               <View style={styles.flipContainer}>
                 {/* FRONT — arc progress */}

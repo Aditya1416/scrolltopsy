@@ -1,3 +1,4 @@
 <resources>
   <string name="app_name">Scrolltopsy</string>
+  <string name="accessibility_service_description">Detects when a blocked app opens and shows a shame screen immediately. Required for instant blocking — without this, detection can take up to 15 seconds.</string>
 </resources>

@@ -5,7 +5,9 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import com.facebook.react.bridge.*
 import java.util.Calendar
@@ -180,8 +182,34 @@ class UsageStatsModule(reactContext: ReactApplicationContext) : ReactContextBase
 
     private fun isUserApp(pm: PackageManager, pkg: String): Boolean {
         return try {
-            val flags = pm.getApplicationInfo(pkg, 0).flags
-            (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0
+            val info = pm.getApplicationInfo(pkg, 0)
+            val isSystem = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            if (!isSystem) return true
+            // Include system apps updated via Play Store (YouTube, Chrome, etc.)
+            val isUpdated = (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (isUpdated) return true
+            // Include pre-installed entertainment/social apps by Android category
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val cat = info.category
+                if (cat == ApplicationInfo.CATEGORY_SOCIAL ||
+                    cat == ApplicationInfo.CATEGORY_VIDEO ||
+                    cat == ApplicationInfo.CATEGORY_AUDIO ||
+                    cat == ApplicationInfo.CATEGORY_NEWS ||
+                    cat == ApplicationInfo.CATEGORY_GAME) return true
+            }
+            // Allowlist for known social/entertainment apps that may not have category metadata
+            SOCIAL_PKGS.any { pkg.startsWith(it) }
         } catch (e: Exception) { true }
+    }
+
+    companion object {
+        private val SOCIAL_PKGS = listOf(
+            "com.google.android.youtube", "com.google.android.apps.youtube",
+            "com.facebook", "com.instagram", "com.twitter", "com.X.android",
+            "com.whatsapp", "com.snapchat", "com.reddit", "com.linkedin",
+            "com.netflix", "com.spotify", "com.amazon.avod", "in.startv.hotstar",
+            "com.zhiliaoapp.musically", "com.ss.android.ugc",
+            "com.tencent.ig", "com.pubg", "com.supercell",
+        )
     }
 }

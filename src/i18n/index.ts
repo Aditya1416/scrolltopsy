@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import en from './locales/en';
 import hi from './locales/hi';
+import hin from './locales/hin';
 import es from './locales/es';
 import fr from './locales/fr';
 import de from './locales/de';
@@ -13,10 +14,13 @@ import ja from './locales/ja';
 import ko from './locales/ko';
 import zh from './locales/zh';
 import ar from './locales/ar';
+import bn from './locales/bn';
 
 export const LANGUAGES = [
   { code: 'en', label: 'English' },
+  { code: 'hin', label: 'Hinglish' },
   { code: 'hi', label: 'हिन्दी' },
+  { code: 'bn', label: 'বাংলা' },
   { code: 'es', label: 'Español' },
   { code: 'fr', label: 'Français' },
   { code: 'de', label: 'Deutsch' },
@@ -40,7 +44,9 @@ export async function initI18n() {
       compatibilityJSON: 'v4',
       resources: {
         en: { translation: en },
+        hin: { translation: hin },
         hi: { translation: hi },
+        bn: { translation: bn },
         es: { translation: es },
         fr: { translation: fr },
         de: { translation: de },

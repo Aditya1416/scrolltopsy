@@ -110,6 +110,11 @@ class TrackingService : Service() {
     }
 
     private fun getCurrentForegroundPkg(): String? {
+        // If accessibility service is running, use its real-time data directly.
+        // This eliminates the ~10-15s UsageStats reporting delay present on all Android devices.
+        if (BlockAccessibilityService.isEnabled) {
+            return BlockAccessibilityService.currentFgPkg?.takeIf { it != packageName }
+        }
         return try {
             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
@@ -234,6 +239,10 @@ class TrackingService : Service() {
     // ── Blocked app interception ──────────────────────────────────────────────
 
     private fun checkBlockedApps() {
+        // BlockAccessibilityService handles blocking in real-time when enabled.
+        // Skip this polling-based fallback to avoid duplicate intercepts.
+        if (BlockAccessibilityService.isEnabled) return
+
         val blockerPrefs = getSharedPreferences(BlockerModule.PREFS_NAME, Context.MODE_PRIVATE)
         val blockedPkgs = blockerPrefs.all.keys
             .filter { it.startsWith(BlockerModule.KEY_PREFIX) }
@@ -396,7 +405,11 @@ class TrackingService : Service() {
     private fun isUserApp(pm: PackageManager, pkg: String): Boolean {
         return try {
             val flags = pm.getApplicationInfo(pkg, 0).flags
-            (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0
+            val isSystem = (flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            // FLAG_UPDATED_SYSTEM_APP: pre-installed apps that have been updated via Play Store
+            // (YouTube, Chrome, Maps, etc.). Treat these as user apps so they get tracked.
+            val isUpdated = (flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            !isSystem || isUpdated
         } catch (_: Exception) { true }
     }
 

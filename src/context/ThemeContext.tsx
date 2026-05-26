@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DARK, LIGHT } from '../theme';
+import { blockerModule } from '../lib/nativeModules';
 
 const THEME_KEY = 'sct_theme';
 
@@ -23,7 +24,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY).then(v => {
-      if (v === 'light') setIsDark(false);
+      const dark = v !== 'light';
+      setIsDark(dark);
+      blockerModule.setTheme(dark);
     });
   }, []);
 
@@ -31,6 +34,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const next = !isDark;
     setIsDark(next);
     AsyncStorage.setItem(THEME_KEY, next ? 'dark' : 'light');
+    blockerModule.setTheme(next);
   };
 
   return (
