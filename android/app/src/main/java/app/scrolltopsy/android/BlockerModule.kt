@@ -14,10 +14,21 @@ class BlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         const val PREFS_NAME = "scrolltopsy_blocks"
         const val KEY_PREFIX = "block_"
         const val KEY_SCREENS = "screens_"
-        const val KEY_BLOCK_ENABLED = "block_on_overtime_enabled"
+        const val KEY_FORCE_STOP = "force_stop_"
+        const val KEY_GAUNTLET_TS = "gauntlet_ts_"
+        const val KEY_BLOCK_ENABLED = "block_on_overtime_enabled" // legacy, unused
+        const val KEY_THEME_DARK = "theme_dark"
     }
 
     private val prefs get() = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    @ReactMethod fun setForceStop(packageName: String, enabled: Boolean) {
+        prefs.edit().putBoolean("$KEY_FORCE_STOP$packageName", enabled).apply()
+    }
+
+    @ReactMethod fun isForceStopEnabled(packageName: String, promise: Promise) {
+        promise.resolve(prefs.getBoolean("$KEY_FORCE_STOP$packageName", false))
+    }
 
     @ReactMethod fun setBlockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BLOCK_ENABLED, enabled).apply()
@@ -38,7 +49,16 @@ class BlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         prefs.edit()
             .remove("$KEY_PREFIX$packageName")
             .remove("$KEY_SCREENS$packageName")
+            .remove("$KEY_GAUNTLET_TS$packageName")
             .apply()
+    }
+
+    @ReactMethod fun clearGauntlet(packageName: String) {
+        prefs.edit().remove("${KEY_GAUNTLET_TS}$packageName").apply()
+    }
+
+    @ReactMethod fun setThemeDark(isDark: Boolean) {
+        prefs.edit().putBoolean(KEY_THEME_DARK, isDark).apply()
     }
 
     @ReactMethod fun getBlockedApps(promise: Promise) {
@@ -64,6 +84,17 @@ class BlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         } else {
             promise.resolve(true)
         }
+    }
+
+    @ReactMethod fun hasAccessibilityPermission(promise: Promise) {
+        promise.resolve(BlockAccessibilityService.isGranted(reactApplicationContext))
+    }
+
+    @ReactMethod fun requestAccessibilityPermission() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        reactApplicationContext.startActivity(intent)
     }
 
     @ReactMethod fun requestOverlayPermission() {

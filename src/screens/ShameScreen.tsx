@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Animated,
+  View, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Animated, Share,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +13,11 @@ import MonoText from '../components/MonoText';
 
 interface Props {
   navigation: any;
-  route: { params: { durationMins: number } };
+  route: { params: { durationMins: number; pkg?: string; appName?: string } };
 }
 
 export default function ShameScreen({ navigation, route }: Props) {
-  const { durationMins } = route.params;
+  const { durationMins, pkg, appName } = route.params;
   const insets = useSafeAreaInsets();
   const { C, isDark } = useTheme();
   const { t } = useTranslation();
@@ -42,7 +42,12 @@ export default function ShameScreen({ navigation, route }: Props) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
     getData().then(d => {
-      const { message: msg, id } = getShameMessage(durationMins, d.lastShameId, d.totalSessions);
+      const { message: msg } = getShameMessage(durationMins, d.lastShameId, d.totalSessions, {
+        pkg: pkg ?? '',
+        appName: appName ?? '',
+        hour: new Date().getHours(),
+        sessionCountToday: d.totalSessions,
+      });
       setMessage(msg);
       setData(d);
     });
@@ -85,6 +90,16 @@ export default function ShameScreen({ navigation, route }: Props) {
     }, 1900);
     return () => clearTimeout(tid);
   }, [message]);
+
+  const handleShare = async () => {
+    const appLabel = appName ? `on ${appName}` : 'doomscrolling';
+    await Share.share({
+      message:
+        `${durationMins} minutes wasted ${appLabel} today.\n` +
+        `${eq.pages} pages i could have read. ${eq.steps.toLocaleString()} steps i could have walked.\n\n` +
+        `scrolltopsy — screen time autopsy\n#scrolltopsy #doomscrolling`,
+    }).catch(() => {});
+  };
 
   const ledger = [
     { label: t('shame_pages'), value: String(eq.pages) },
@@ -170,6 +185,10 @@ export default function ShameScreen({ navigation, route }: Props) {
         <MonoText size={9} color={C.textMuted}>  ·  </MonoText>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
           <MonoText size={9} color={C.textSub}>{t('shame_done')}</MonoText>
+        </TouchableOpacity>
+        <MonoText size={9} color={C.textMuted}>  ·  </MonoText>
+        <TouchableOpacity onPress={handleShare}>
+          <MonoText size={9} color={C.textSub}>{t('shame_share')}</MonoText>
         </TouchableOpacity>
       </View>
     </ScrollView>

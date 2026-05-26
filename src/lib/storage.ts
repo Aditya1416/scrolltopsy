@@ -1,11 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'sct_data_v3';
+const PROFILE_KEY = 'sct_profile_v1';
 
 export interface Session {
   id: string;
   startedAt: number;
   durationMins: number;
+}
+
+export interface UserProfile {
+  age?: number;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not';
+  birthday?: string;
+  phone?: string;
+  pincode?: string;
+  photoUri?: string;
 }
 
 export interface StorageData {
@@ -68,6 +78,17 @@ export async function getTodaySessions(): Promise<Session[]> {
 
 export async function deleteAllData(): Promise<void> {
   await AsyncStorage.removeItem(KEY);
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+  try {
+    const raw = await AsyncStorage.getItem(PROFILE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+export async function saveUserProfile(profile: UserProfile): Promise<void> {
+  await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
 function computeScrolltype(sessions: Session[]): string {
