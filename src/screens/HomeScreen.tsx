@@ -6,7 +6,7 @@ import {
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import { usageStatsModule, trackingServiceModule, AppUsage, AppSession } from '../lib/nativeModules';
 import { analyzeUsage, classifyScrolltype, predictRisk, getTopCategory } from '../lib/behaviorEngine';
 import { loadLearnedApps } from '../lib/learnedApps';
@@ -44,12 +44,6 @@ interface SliceData {
   startAngle: number;
   endAngle: number;
 }
-
-const RISK_COLOR: Record<string, string> = {
-  low: '#666666',
-  medium: '#c8953a',
-  high: C.alarm,
-};
 
 function polar(cx: number, cy: number, r: number, deg: number) {
   const rad = ((deg - 90) * Math.PI) / 180;
@@ -98,6 +92,10 @@ function formatSessionTime(ts: number): string {
 
 export default function HomeScreen({ navigation, user }: Props) {
   const insets = useSafeAreaInsets();
+  const { C, isDark } = useTheme();
+
+  const RISK_COLOR = { low: C.textMuted, medium: '#c8953a', high: C.alarm };
+
   const [showSettings, setShowSettings] = useState(false);
   const [quotas, setQuotas] = useState<Record<string, number>>({});
   const [quotaPicker, setQuotaPicker] = useState<{ packageName: string; appName: string } | null>(null);
@@ -256,11 +254,11 @@ export default function HomeScreen({ navigation, user }: Props) {
   const shameMsg = sliceIsOver ? getShameMessage(sliceOverMins, '', sliceSessions.length).message : null;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+    <View style={[styles.root, { backgroundColor: C.void, paddingTop: insets.top }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={C.void} translucent />
 
       <View style={styles.topBar}>
-        <MonoText size={9} color={C.textSub}>
+        <MonoText size={9} color={C.textMuted}>
           {`SCR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}`}
         </MonoText>
         <TouchableOpacity onPress={() => setShowSettings(true)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -276,7 +274,7 @@ export default function HomeScreen({ navigation, user }: Props) {
         ) : null}
 
         {state.hasPermission === false ? (
-          <View style={styles.permBox}>
+          <View style={[styles.permBox, { borderColor: 'rgba(226,75,74,0.3)' }]}>
             {Platform.OS === 'ios' ? (
               <>
                 <MonoText bold size={13} color={C.alarm} style={{ marginBottom: 8 }}>ios detected</MonoText>
@@ -300,7 +298,6 @@ export default function HomeScreen({ navigation, user }: Props) {
         ) : (
           <>
             <View style={styles.arcCard}>
-              {/* 3D flip container */}
               <View style={styles.flipContainer}>
                 {/* FRONT — arc progress */}
                 <Animated.View style={[
@@ -309,7 +306,7 @@ export default function HomeScreen({ navigation, user }: Props) {
                 ]}>
                   <TouchableOpacity onPress={handleArcPress} activeOpacity={slices.length > 0 ? 0.85 : 1}>
                     <Svg width={200} height={200} viewBox="0 0 200 200">
-                      <Circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" />
+                      <Circle cx="100" cy="100" r="80" fill="none" stroke={C.separator} strokeWidth="1.5" />
                       <AnimatedCircle
                         cx="100" cy="100" r="80"
                         fill="none"
@@ -326,7 +323,7 @@ export default function HomeScreen({ navigation, user }: Props) {
                       <MonoText bold size={36} color={C.alarm}>{String(state.totalDoomMins)}</MonoText>
                       <MonoText size={9} color={C.textMuted} style={{ marginTop: 2 }}>doom mins today</MonoText>
                       {slices.length > 0 && (
-                        <MonoText size={8} color="rgba(255,255,255,0.18)" style={{ marginTop: 6 }}>tap for breakdown</MonoText>
+                        <MonoText size={8} color={C.separator} style={{ marginTop: 6 }}>tap for breakdown</MonoText>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -346,12 +343,11 @@ export default function HomeScreen({ navigation, user }: Props) {
                         onPress={() => handleSlicePress(slice)}
                       />
                     ))}
-                    {/* donut hole — tap to flip back */}
-                    <Circle cx="100" cy="100" r="34" fill="#000" onPress={handleArcPress} />
+                    <Circle cx="100" cy="100" r="34" fill={C.void} onPress={handleArcPress} />
                     <SvgText
                       x="100" y="106"
                       textAnchor="middle"
-                      fill="rgba(255,255,255,0.35)"
+                      fill={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
                       fontSize="18"
                       onPress={handleArcPress}
                     >↩</SvgText>
@@ -359,7 +355,7 @@ export default function HomeScreen({ navigation, user }: Props) {
                 </Animated.View>
               </View>
 
-              {/* Legend (shown when flipped) */}
+              {/* Legend */}
               {pieFlipped && slices.length > 0 && (
                 <View style={styles.legend}>
                   {slices.map(slice => (
@@ -384,7 +380,7 @@ export default function HomeScreen({ navigation, user }: Props) {
             {state.topApps.length > 0 && (
               <View style={styles.topAppsSection}>
                 <MonoText size={9} color={C.textMuted} style={{ marginBottom: 10 }}>
-                  top offenders today  <MonoText size={8} color='#444444'>· tap to set limit</MonoText>
+                  top offenders today  <MonoText size={8} color={C.textMuted}>· tap to set limit</MonoText>
                 </MonoText>
                 {state.topApps.map((app, i) => {
                   const quota = quotas[app.packageName] || 0;
@@ -395,6 +391,7 @@ export default function HomeScreen({ navigation, user }: Props) {
                       key={`${app.appName}-${i}`}
                       style={[
                         styles.appRow,
+                        { borderBottomColor: C.separator },
                         {
                           opacity: listAnims[i],
                           transform: [{ translateX: listAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
@@ -407,18 +404,18 @@ export default function HomeScreen({ navigation, user }: Props) {
                         activeOpacity={0.6}
                       >
                         <MonoText size={11} color={isOver ? C.alarm : C.text}>{app.appName}</MonoText>
-                        <View style={[styles.catBadge, app.category === 'social' || app.category === 'entertainment' ? styles.catBadgeRed : {}]}>
+                        <View style={[styles.catBadge, { backgroundColor: C.glass }, app.category === 'social' || app.category === 'entertainment' ? { backgroundColor: C.alarmDim } : {}]}>
                           <MonoText size={8} color={C.textMuted}>{CATEGORY_LABELS[app.category as keyof typeof CATEGORY_LABELS] ?? app.category}</MonoText>
                         </View>
                         {quota > 0 && (
-                          <View style={[styles.quotaBadge, isOver ? styles.quotaBadgeOver : {}]}>
-                            <MonoText size={8} color={isOver ? C.alarm : '#888888'}>
+                          <View style={[styles.quotaBadge, { backgroundColor: C.glass }, isOver ? { backgroundColor: C.alarmDim } : {}]}>
+                            <MonoText size={8} color={isOver ? C.alarm : C.textMuted}>
                               {isOver ? `+${overMins}m` : `≤${quota}m`}
                             </MonoText>
                           </View>
                         )}
                       </TouchableOpacity>
-                      <MonoText size={11} color={isOver ? C.alarm : app.mins > 60 ? '#c8953a' : '#aaaaaa'}>{`${app.mins}m`}</MonoText>
+                      <MonoText size={11} color={isOver ? C.alarm : app.mins > 60 ? '#c8953a' : C.textSub}>{`${app.mins}m`}</MonoText>
                     </Animated.View>
                   );
                 })}
@@ -432,11 +429,11 @@ export default function HomeScreen({ navigation, user }: Props) {
                   .sort((a, b) => b[1] - a[1])
                   .map(([cat, mins]) => (
                     <View key={cat} style={styles.catRow}>
-                      <MonoText size={10} color='#888888'>{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] ?? cat}</MonoText>
-                      <View style={styles.catBarTrack}>
+                      <MonoText size={10} color={C.textMuted}>{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] ?? cat}</MonoText>
+                      <View style={[styles.catBarTrack, { backgroundColor: C.separator }]}>
                         <View style={[styles.catBarFill, { width: `${Math.min((mins / Math.max(state.totalDoomMins, 1)) * 100, 100)}%` }]} />
                       </View>
-                      <MonoText size={10} color='#888888' style={{ width: 36, textAlign: 'right' }}>{`${mins}m`}</MonoText>
+                      <MonoText size={10} color={C.textMuted} style={{ width: 36, textAlign: 'right' }}>{`${mins}m`}</MonoText>
                     </View>
                   ))}
               </View>
@@ -446,22 +443,22 @@ export default function HomeScreen({ navigation, user }: Props) {
       </ScrollView>
 
       <View style={[styles.bottomArea, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.ctaDivider} />
+        <View style={[styles.ctaDivider, { backgroundColor: C.separator }]} />
         <TouchableOpacity style={styles.sessionBtn} onPress={() => navigation.navigate('Tracking')}>
           <MonoText size={12} color={C.alarm}>→ track a session</MonoText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.serviceBtn} onPress={handleToggleService} disabled={state.hasPermission === false}>
-          <MonoText size={12} color={state.serviceRunning ? C.alarm : '#aaaaaa'}>
+          <MonoText size={12} color={state.serviceRunning ? C.alarm : C.text}>
             {state.serviceRunning ? '● tracking active — tap to stop' : '○ start background tracking'}
           </MonoText>
         </TouchableOpacity>
         {Platform.OS === 'android' && (
           <TouchableOpacity style={styles.blockToggleRow} onPress={handleToggleBlock}>
-            <MonoText size={10} color={blockEnabled ? '#888888' : '#444444'} style={{ flex: 1 }}>
+            <MonoText size={10} color={blockEnabled ? C.textSub : C.textMuted} style={{ flex: 1 }}>
               force-block overtime apps
             </MonoText>
-            <View style={[styles.togglePill, blockEnabled && styles.togglePillOn]}>
-              <View style={[styles.toggleThumb, blockEnabled && styles.toggleThumbOn]} />
+            <View style={[styles.togglePill, { backgroundColor: blockEnabled ? C.alarmDim : C.surface2 }]}>
+              <View style={[styles.toggleThumb, { backgroundColor: blockEnabled ? C.alarm : C.textMuted, alignSelf: blockEnabled ? 'flex-end' : 'flex-start' }]} />
             </View>
           </TouchableOpacity>
         )}
@@ -476,12 +473,11 @@ export default function HomeScreen({ navigation, user }: Props) {
         onRequestClose={() => setSelectedSlice(null)}
       >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedSlice(null)} />
-        <View style={[styles.slicePanel, { paddingBottom: insets.bottom + 24 }]}>
-          <View style={styles.panelHandle} />
+        <View style={[styles.slicePanel, { backgroundColor: C.surface, borderTopColor: C.glassBorder, paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.panelHandle, { backgroundColor: C.glassBorder }]} />
 
           {selectedSlice && (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Header */}
               <View style={styles.sliceHeader}>
                 <View style={[styles.sliceHeaderDot, { backgroundColor: selectedSlice.color }]} />
                 <MonoText bold size={15} color={C.text}>{selectedSlice.appName}</MonoText>
@@ -490,19 +486,17 @@ export default function HomeScreen({ navigation, user }: Props) {
                 {selectedSlice.mins}m today  ·  {Math.round(selectedSlice.pct * 100)}% of doom time
               </MonoText>
               {sliceQuota > 0 && (
-                <MonoText size={10} color={sliceIsOver ? C.alarm : '#888888'} style={{ marginBottom: 16 }}>
+                <MonoText size={10} color={sliceIsOver ? C.alarm : C.textMuted} style={{ marginBottom: 16 }}>
                   {sliceIsOver ? `limit: ${sliceQuota}m  ·  +${sliceOverMins}m over` : `limit: ${sliceQuota}m  ·  within quota`}
                 </MonoText>
               )}
 
-              {/* Shame message */}
               {shameMsg && (
-                <View style={styles.shameBox}>
+                <View style={[styles.shameBox, { borderColor: 'rgba(226,75,74,0.25)', backgroundColor: C.alarmDim }]}>
                   <MonoText size={10} color={C.alarm} style={{ lineHeight: 18 }}>{shameMsg}</MonoText>
                 </View>
               )}
 
-              {/* Sessions */}
               <MonoText size={9} color={C.textMuted} style={{ marginTop: 16, marginBottom: 8 }}>
                 {loadingSessions ? 'loading sessions…' : `sessions today (${sliceSessions.length})`}
               </MonoText>
@@ -514,11 +508,11 @@ export default function HomeScreen({ navigation, user }: Props) {
               {sliceSessions.map((session, i) => {
                 const durationMins = Math.max(1, Math.ceil(session.durationMs / 60_000));
                 return (
-                  <View key={i} style={styles.sessionRow}>
+                  <View key={i} style={[styles.sessionRow, { borderBottomColor: C.separator }]}>
                     <MonoText size={11} color={C.textSub}>
                       {formatSessionTime(session.startTime)} → {formatSessionTime(session.endTime)}
                     </MonoText>
-                    <MonoText size={11} color={durationMins >= 30 ? C.alarm : durationMins >= 10 ? '#c8953a' : '#888888'}>
+                    <MonoText size={11} color={durationMins >= 30 ? C.alarm : durationMins >= 10 ? '#c8953a' : C.textMuted}>
                       {durationMins}m
                     </MonoText>
                   </View>
@@ -548,12 +542,12 @@ export default function HomeScreen({ navigation, user }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1 },
   scrollView: { flex: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12 },
   scroll: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 24 },
-  permBox: { width: '100%', marginTop: 40, padding: 20, borderWidth: 0.5, borderColor: 'rgba(226,75,74,0.3)', borderRadius: 4 },
-  permBtn: { backgroundColor: C.alarm, paddingVertical: 14, alignItems: 'center', borderRadius: 2 },
+  permBox: { width: '100%', marginTop: 40, padding: 20, borderWidth: 0.5, borderRadius: 4 },
+  permBtn: { backgroundColor: '#E24B4A', paddingVertical: 14, alignItems: 'center', borderRadius: 2 },
   arcCard: { width: '100%', alignItems: 'center', marginBottom: 8, paddingVertical: 8 },
   flipContainer: { width: 200, height: 200 },
   arcFace: {
@@ -575,31 +569,24 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   riskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   topAppsSection: { width: '100%', marginTop: 16 },
-  appRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  appRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5 },
   appLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  catBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.04)' },
-  catBadgeRed: { backgroundColor: 'rgba(226,75,74,0.08)' },
-  quotaBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.04)' },
-  quotaBadgeOver: { backgroundColor: 'rgba(226,75,74,0.12)' },
+  catBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2 },
+  quotaBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2 },
   catBreakdown: { width: '100%', marginTop: 24 },
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  catBarTrack: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 10, overflow: 'hidden' },
-  catBarFill: { height: '100%', backgroundColor: C.alarm },
+  catBarTrack: { flex: 1, height: 1, marginHorizontal: 10, overflow: 'hidden' },
+  catBarFill: { height: '100%', backgroundColor: '#E24B4A' },
   bottomArea: { alignItems: 'center', paddingHorizontal: 24 },
-  ctaDivider: { width: '100%', height: 0.5, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 4 },
+  ctaDivider: { width: '100%', height: 0.5, marginBottom: 4 },
   sessionBtn: { paddingVertical: 14, alignItems: 'center' },
   serviceBtn: { paddingVertical: 12, alignItems: 'center' },
   blockToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, width: '100%', paddingHorizontal: 4 },
-  togglePill: { width: 36, height: 20, borderRadius: 10, backgroundColor: '#1e1e1e', justifyContent: 'center', paddingHorizontal: 2 },
-  togglePillOn: { backgroundColor: '#2a1a1a' },
-  toggleThumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#333333' },
-  toggleThumbOn: { backgroundColor: C.alarm, alignSelf: 'flex-end' },
-  // Slice detail modal
+  togglePill: { width: 36, height: 20, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleThumb: { width: 16, height: 16, borderRadius: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   slicePanel: {
-    backgroundColor: '#0a0a0a',
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.08)',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 24,
@@ -608,7 +595,6 @@ const styles = StyleSheet.create({
   },
   panelHandle: {
     width: 32, height: 3,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
@@ -619,15 +605,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 12,
     borderWidth: 0.5,
-    borderColor: 'rgba(226,75,74,0.25)',
     borderRadius: 4,
-    backgroundColor: 'rgba(226,75,74,0.04)',
   },
   sessionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
 });

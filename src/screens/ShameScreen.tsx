@@ -4,9 +4,9 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, F } from '../theme';
 import { getData } from '../lib/storage';
 import { getShameMessage, getEquivalences } from '../lib/shame';
+import { useTheme } from '../context/ThemeContext';
 import GlassCard from '../components/GlassCard';
 import MonoText from '../components/MonoText';
 
@@ -18,6 +18,7 @@ interface Props {
 export default function ShameScreen({ navigation, route }: Props) {
   const { durationMins } = route.params;
   const insets = useSafeAreaInsets();
+  const { C, isDark } = useTheme();
   const eq = getEquivalences(durationMins);
 
   const [message, setMessage] = useState('');
@@ -70,7 +71,6 @@ export default function ShameScreen({ navigation, route }: Props) {
     ]).start();
   }, []);
 
-  // Typewriter fires when message arrives and fadeNote animates in
   useEffect(() => {
     if (!message) return;
     const tid = setTimeout(() => {
@@ -93,18 +93,16 @@ export default function ShameScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: C.void }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}
       showsVerticalScrollIndicator={false}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={C.void} />
 
-      {/* Header */}
       <Animated.View style={{ opacity: fadeHeader, marginBottom: 32 }}>
         <MonoText size={9} color={C.textMuted}>autopsy complete</MonoText>
       </Animated.View>
 
-      {/* Big number */}
       <Animated.View style={{ transform: [{ scale: scaleNumber }], opacity: fadeNumber, alignItems: 'center' }}>
         <MonoText
           bold size={88} color={C.alarm}
@@ -118,26 +116,22 @@ export default function ShameScreen({ navigation, route }: Props) {
         </MonoText>
       </Animated.View>
 
-      {/* Label */}
       <Animated.View style={{ opacity: fadeLabel, marginBottom: 24 }}>
         <MonoText size={11} color={C.textMuted}>minutes unrecoverable</MonoText>
       </Animated.View>
 
-      {/* Divider */}
-      <Animated.View style={[styles.divider, { opacity: fadeDivider }]} />
+      <Animated.View style={[styles.divider, { opacity: fadeDivider, backgroundColor: C.separator }]} />
 
-      {/* Ledger */}
       <Animated.View style={{ opacity: fadeLedger, width: '100%', marginBottom: 24, marginTop: 16 }}>
         {ledger.map((row, i) => (
           <View key={i} style={styles.ledgerRow}>
             <MonoText size={11} color={C.textMuted}>{row.label}</MonoText>
-            <View style={styles.ledgerDots} />
+            <View style={[styles.ledgerDots, { borderColor: C.textMuted }]} />
             <MonoText size={11} color={C.textSub}>{row.value}</MonoText>
           </View>
         ))}
       </Animated.View>
 
-      {/* Physician's note */}
       <Animated.View style={{ opacity: fadeNote, width: '100%', marginBottom: 20 }}>
         <GlassCard>
           <MonoText italic size={11} color={C.textSub} style={{ lineHeight: 18 }}>
@@ -146,7 +140,6 @@ export default function ShameScreen({ navigation, route }: Props) {
         </GlassCard>
       </Animated.View>
 
-      {/* Session stats */}
       {data && (
         <Animated.View style={{ opacity: fadeStats, marginBottom: 20 }}>
           <MonoText size={10} color={C.textMuted}>
@@ -155,7 +148,6 @@ export default function ShameScreen({ navigation, route }: Props) {
         </Animated.View>
       )}
 
-      {/* Scrolltype card */}
       {data?.scrolltype ? (
         <Animated.View style={{ opacity: fadeScrolltype, transform: [{ scale: scaleScrolltype }], width: '100%', marginBottom: 32 }}>
           <GlassCard style={{ borderColor: 'rgba(226,75,74,0.3)' }}>
@@ -165,14 +157,13 @@ export default function ShameScreen({ navigation, route }: Props) {
         </Animated.View>
       ) : null}
 
-      {/* Footnotes */}
       <View style={styles.footnotes}>
         <TouchableOpacity onPress={() => navigation.replace('Tracking')}>
-          <MonoText size={9} color={C.textMuted} style={{ opacity: 0.4 }}>go again</MonoText>
+          <MonoText size={9} color={C.textSub}>go again</MonoText>
         </TouchableOpacity>
-        <MonoText size={9} color={C.textMuted} style={{ opacity: 0.4 }}>  ·  </MonoText>
+        <MonoText size={9} color={C.textMuted}>  ·  </MonoText>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <MonoText size={9} color={C.textMuted} style={{ opacity: 0.4 }}>done for now</MonoText>
+          <MonoText size={9} color={C.textSub}>done for now</MonoText>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -180,14 +171,10 @@ export default function ShameScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.void },
+  root: { flex: 1 },
   content: { paddingHorizontal: 24, alignItems: 'center' },
-  divider: { width: '100%', height: 0.5, backgroundColor: 'rgba(255,255,255,0.08)' },
-  ledgerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-  },
-  ledgerDots: { flex: 1, height: 1, marginHorizontal: 8, borderStyle: 'dotted', borderBottomWidth: 1, borderColor: C.textMuted },
+  divider: { width: '100%', height: 0.5 },
+  ledgerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  ledgerDots: { flex: 1, height: 1, marginHorizontal: 8, borderStyle: 'dotted', borderBottomWidth: 1 },
   footnotes: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
 });

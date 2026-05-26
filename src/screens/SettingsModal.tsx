@@ -4,7 +4,7 @@ import {
   Linking, ScrollView, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import { signInWithGoogle, signOut, deleteAccount, acceptPrivacy } from '../lib/auth';
 import { syncToFirestore } from '../lib/sync';
 import { deleteAllData } from '../lib/storage';
@@ -18,6 +18,7 @@ interface Props {
 
 export default function SettingsModal({ visible, onClose, user }: Props) {
   const insets = useSafeAreaInsets();
+  const { C, isDark, toggleTheme } = useTheme();
   const [backupStatus, setBackupStatus] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -90,8 +91,8 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay} />
       </TouchableWithoutFeedback>
-      <View style={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>
-        <View style={styles.handle} />
+      <View style={[styles.panel, { backgroundColor: C.surface, borderTopColor: C.glassBorder, paddingBottom: insets.bottom + 24 }]}>
+        <View style={[styles.handle, { backgroundColor: C.glassBorder }]} />
         <ScrollView showsVerticalScrollIndicator={false}>
           {user ? (
             <>
@@ -104,21 +105,31 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
               <MonoText size={10} color={user?.emailVerified ? '#1D9E75' : C.alarm} style={{ marginTop: 4, marginBottom: 20 }}>
                 {user?.emailVerified ? '✓ verified' : '⚠ not verified — check email'}
               </MonoText>
-              <Row label="back up my data" onPress={handleBackup} loading={loading} />
+              <Row label="back up my data" onPress={handleBackup} loading={loading} C={C} />
               {backupStatus ? <MonoText size={10} color={C.textSub} style={styles.statusText}>{backupStatus}</MonoText> : null}
-              <Row label="share this week" onPress={handleShare} />
+              <Row label="share this week" onPress={handleShare} C={C} />
               {shareUrl ? <MonoText size={9} color={C.textSub} style={styles.statusText}>{shareUrl}</MonoText> : null}
-              <Row label="sign out" onPress={handleSignOut} />
-              <Row label="delete all my data" onPress={handleDelete} danger />
+              <Row label="sign out" onPress={handleSignOut} C={C} />
+              <Row label="delete all my data" onPress={handleDelete} danger C={C} />
             </>
           ) : (
             <>
-              <Row label={loading ? 'signing in…' : 'sign in with google →'} onPress={handleSignIn} loading={loading} />
+              <Row label={loading ? 'signing in…' : 'sign in with google →'} onPress={handleSignIn} loading={loading} C={C} />
             </>
           )}
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.separator }]} />
+
+          {/* Light / dark toggle */}
+          <TouchableOpacity style={[styles.themeRow, { borderBottomColor: C.separator }]} onPress={toggleTheme}>
+            <MonoText size={13} color={C.textSub} style={{ flex: 1 }}>
+              {isDark ? 'light mode' : 'dark mode'}
+            </MonoText>
+            <MonoText size={11} color={C.textMuted}>{isDark ? '○' : '●'}</MonoText>
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: C.separator }]} />
           <TouchableOpacity onPress={() => Linking.openURL('https://scrolltopsy.vercel.app/privacy')}>
-            <MonoText size={10} color={C.textMuted} style={styles.row}>privacy policy</MonoText>
+            <MonoText size={10} color={C.textMuted} style={[styles.row, { borderBottomColor: C.separator }]}>privacy policy</MonoText>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -126,10 +137,10 @@ export default function SettingsModal({ visible, onClose, user }: Props) {
   );
 }
 
-function Row({ label, onPress, danger, loading }: { label: string; onPress: () => void; danger?: boolean; loading?: boolean }) {
+function Row({ label, onPress, danger, loading, C }: { label: string; onPress: () => void; danger?: boolean; loading?: boolean; C: any }) {
   return (
     <TouchableOpacity onPress={onPress} disabled={loading}>
-      <MonoText size={13} color={danger ? C.alarm : C.textSub} style={styles.row}>
+      <MonoText size={13} color={danger ? C.alarm : C.textSub} style={[styles.row, { borderBottomColor: C.separator }]}>
         {label}
       </MonoText>
     </TouchableOpacity>
@@ -139,9 +150,7 @@ function Row({ label, onPress, danger, loading }: { label: string; onPress: () =
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   panel: {
-    backgroundColor: '#0a0a0a',
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.08)',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 24,
@@ -151,13 +160,13 @@ const styles = StyleSheet.create({
   handle: {
     width: 32,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
   },
-  row: { paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  row: { paddingVertical: 14, borderBottomWidth: 0.5 },
+  themeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 0.5 },
   userName: { marginBottom: 4 },
   statusText: { paddingVertical: 6, paddingLeft: 4 },
-  divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 12 },
+  divider: { height: 0.5, marginVertical: 12 },
 });

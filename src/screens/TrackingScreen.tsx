@@ -6,10 +6,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, F } from '../theme';
 import { saveSession } from '../lib/storage';
 import { syncToFirestore } from '../lib/sync';
 import { auth } from '../lib/firebase';
+import { useTheme } from '../context/ThemeContext';
 import MonoText from '../components/MonoText';
 
 const SESSION_KEY = 'sct_session_start';
@@ -18,6 +18,7 @@ interface Props { navigation: any; }
 
 export default function TrackingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { C, isDark } = useTheme();
   const startTimeRef = useRef<string>('');
   const [elapsed, setElapsed] = useState(0);
   const pulse = useRef(new Animated.Value(0)).current;
@@ -78,16 +79,11 @@ export default function TrackingScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <View style={[styles.root, { backgroundColor: C.void, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={C.void} />
 
-      {/* Pulsing glow */}
-      <Animated.View
-        style={[styles.pulse, { opacity: pulseOpacity }]}
-        pointerEvents="none"
-      />
+      <Animated.View style={[styles.pulse, { opacity: pulseOpacity }]} pointerEvents="none" />
 
-      {/* Timer */}
       <View style={styles.timerArea}>
         <MonoText
           bold
@@ -106,9 +102,8 @@ export default function TrackingScreen({ navigation }: Props) {
         </MonoText>
       </View>
 
-      {/* Done button */}
       <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
-        <MonoText size={13} color={C.textSub} style={{ paddingVertical: 20 }}>
+        <MonoText size={13} color={C.text} style={{ paddingVertical: 20 }}>
           i'm done
         </MonoText>
       </TouchableOpacity>
@@ -117,12 +112,7 @@ export default function TrackingScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.void,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  root: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pulse: {
     position: 'absolute',
     width: 300,
