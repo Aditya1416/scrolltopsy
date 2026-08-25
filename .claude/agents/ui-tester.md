@@ -2,7 +2,7 @@
 name: ui-tester
 description: Tests every screen, button, and navigation flow by reading all component files statically. Use after any screen changes.
 tools: Read, Grep, Glob
-model: claude-sonnet-4-20250514
+model: claude-sonnet-4-6
 permissionMode: default
 ---
 You are a QA engineer. Read ALL screen and component files. Static code analysis only.

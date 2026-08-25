@@ -2,7 +2,7 @@
 name: security-reviewer
 description: Reviews code for exposed secrets, API keys, auth vulnerabilities, and Firestore security gaps. Use before any commit touching auth, Firebase config, or environment variables.
 tools: Read, Grep, Glob, Bash
-model: claude-sonnet-4-20250514
+model: claude-sonnet-4-6
 permissionMode: default
 ---
 You are a senior application security engineer reviewing a React Native Expo app.
